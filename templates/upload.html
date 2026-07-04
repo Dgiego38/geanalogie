@@ -1,120 +1,64 @@
 <!DOCTYPE html>
 <html lang="fr">
-
 <head>
     <meta charset="UTF-8">
     <title>Charger un GEDCOM</title>
-
-    {{ url_for('static', filename='css/style.css') }}
+    <!-- Correction : ajout de la balise <link> pour le CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-
 <body>
 
     <h1>🧬 Importer votre fichier GEDCOM</h1>
-
     <input type="file" id="gedFile" accept=".ged">
-
-    <button onclick="importGed()">
-        Continuer
-    </button>
-
+    <button onclick="importGed()">Continuer</button>
     <p id="status"></p>
 
     <script type="module">
-
         import { upload } from "https://esm.sh/@vercel/blob/client";
 
         window.importGed = async function () {
-
-            const file = document.getElementById(
-                "gedFile"
-            ).files[0];
+            const fileInput = document.getElementById("gedFile");
+            const file = fileInput.files[0];
+            const status = document.getElementById("status");
 
             if (!file) {
-
-                alert(
-                    "Choisissez un fichier GEDCOM"
-                );
-
+                alert("Choisissez un fichier GEDCOM");
                 return;
             }
 
             try {
+                status.innerText = "Upload vers Blob...";
 
-                document.getElementById(
-                    "status"
-                ).innerText =
-                    "Upload vers Blob...";
+                // Upload direct vers Vercel Blob
+                const blob = await upload(file.name, file, {
+                    access: "public",
+                    handleUploadUrl: "/api/upload"
+                });
 
-                const blob = await upload(
-                    file.name,
-                    file,
-                    {
-                        access: "public",
-                        handleUploadUrl:
-                            "/api/upload"
-                    }
-                );
+                status.innerText = "Traitement du GEDCOM...";
 
-                console.log(
-                    "Blob URL :",
-                    blob.url
-                );
+                // Notification serveur
+                const response = await fetch("/process_blob", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url: blob.url })
+                });
 
-                document.getElementById(
-                    "status"
-                ).innerText =
-                    "Traitement du GEDCOM...";
+                const result = await response.json();
 
-                const response =
-                    await fetch(
-                        "/process_blob",
-                        {
-                            method: "POST",
-                            headers: {
-                                "Content-Type":
-                                    "application/json"
-                            },
-                            body: JSON.stringify({
-                                url:
-                                    blob.url
-                            })
-                        }
-                    );
-
-                const result =
-                    await response.json();
-
-                if (result.success) {
-
-                    document.getElementById(
-                        "status"
-                    ).innerText =
-                        "GEDCOM chargé.";
-
-                    window.location.href =
-                        "/menu";
-
+                if (response.ok && result.success) {
+                    status.innerText = "GEDCOM chargé.";
+                    window.location.href = "/menu";
                 } else {
-
-                    alert(
-                        result.message ||
-                        "Erreur lors du traitement"
-                    );
+                    throw new Error(result.error || "Erreur lors du traitement");
                 }
 
             } catch (e) {
-
                 console.error(e);
-
-                alert(
-                    "Erreur de communication avec le serveur."
-                );
+                status.innerText = "";
+                alert("Erreur : " + e.message);
             }
         };
-
     </script>
-
 </body>
-
 </html>
