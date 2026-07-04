@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Charger un GEDCOM</title>
+</head>
+
+<body>
+
+    <h1>🧬 Importer votre fichier GEDCOM</h1>
+
+    <input type="file" id="gedFile" accept=".ged">
+
+    <button onclick="importGed()">
+        Continuer
+    </button>
+
+    <p id="status"></p>
+
+    <script>
+
+        async function importGed() {
+
+            const file = document.getElementById("gedFile").files[0];
+
+            if (!file) {
+                alert("Choisissez un fichier GEDCOM");
+                return;
+            }
+
+            document.getElementById("status").innerText =
+                "Chargement du fichier...";
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {
+
+                const response = await fetch("/upload_ged", {
+                    method: "POST",
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+
+                    document.getElementById("status").innerText =
+                        "GEDCOM chargé.";
+
+                    window.location.href = "/menu";
+
+                } else {
+
+                    alert(
+                        result.message ||
+                        "Erreur lors du chargement"
+                    );
+                }
+
+            } catch (e) {
+
+                console.error(e);
+
+                alert(
+                    "Erreur de communication avec le serveur."
+                );
+            }
+        }
+
+    </script>
+
+</body>
+
+</html>
