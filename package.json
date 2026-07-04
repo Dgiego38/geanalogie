@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "@treeviz/gedcom-parser": "^2.0.7",
+    "@vercel/analytics": "^2.0.1",
     "pymongo": "^0.0.1-security"
   }
 }
