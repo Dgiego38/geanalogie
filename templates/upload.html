@@ -38,14 +38,19 @@
                         }
                     }
 
-                    // VITESSE : Batch de 5000 + exécution parallèle par paquets de 5
+                    if (individuals.length === 0) {
+                        alert("Aucun individu trouvé dans ce fichier GEDCOM.");
+                        return;
+                    }
+
+                    // VITESSE : Batch de 5000 + exécution parallèle par paquets de 5[cite: 3]
                     const batchSize = 5000;
                     const tasks = [];
                     
                     for (let i = 0; i < individuals.length; i += batchSize) {
                         const batch = individuals.slice(i, i + batchSize);
                         
-                        // Création de la tâche d'envoi parallèle
+                        // Création de la tâche d'envoi parallèle[cite: 3]
                         const task = (async () => {
                             const blob = new Blob([JSON.stringify({ 
                                 sessionId: sessionId, 
@@ -63,24 +68,33 @@
                                 },
                                 body: compressedBlob
                             });
-                            if (!response.ok) throw new Error("Erreur serveur au lot " + i);
+                            
+                            // NOUVELLE VÉRIFICATION : On vérifie le code HTTP ET le contenu JSON
+                            if (!response.ok) {
+                                throw new Error(`Erreur réseau (Code ${response.status}) au lot ${i}`);
+                            }
+                            
+                            const data = await response.json();
+                            if (!data.success) {
+                                throw new Error(`Erreur serveur au lot ${i} : ${data.error || 'Erreur inconnue'}`);
+                            }
                         })();
 
                         tasks.push(task);
                         status.innerText = `Envoi parallèle : ${i + batch.length} / ${individuals.length}`;
 
-                        // On limite à 5 requêtes simultanées pour ne pas saturer Vercel
+                        // On limite à 5 requêtes simultanées pour ne pas saturer Vercel[cite: 3]
                         if (tasks.length >= 5) {
                             await Promise.all(tasks);
                             tasks.length = 0;
                         }
                     }
-                    await Promise.all(tasks); // Finalisation des derniers lots
+                    await Promise.all(tasks); // Finalisation des derniers lots[cite: 3]
 
                     status.innerText = "Terminé ! Redirection...";
                     window.location.href = "/menu?sessionId=" + sessionId;
                 } catch (err) {
-                    console.error(err);
+                    console.error("Détail de l'erreur :", err);
                     status.innerText = "";
                     alert("Erreur de traitement : " + err.message);
                 }
