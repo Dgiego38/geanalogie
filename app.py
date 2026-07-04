@@ -35,9 +35,11 @@ def construire_base_mongodb():
     persons_collection.delete_many({})
 
     expire_at = (
-        datetime.utcnow() +
-        timedelta(hours=1)
+        datetime.utcnow()
+        + timedelta(hours=1)
     )
+
+    documents = []
 
     for indiv in gedcom_parser.get_root_child_elements():
 
@@ -50,7 +52,7 @@ def construire_base_mongodb():
 
                 prenom, nom = indiv.get_name()
 
-                persons_collection.insert_one({
+                documents.append({
 
                     "id":
                         indiv.get_pointer(),
@@ -60,11 +62,21 @@ def construire_base_mongodb():
 
                     "expireAt":
                         expire_at
-
                 })
 
             except:
                 pass
+
+    if documents:
+
+        persons_collection.insert_many(
+            documents
+        )
+
+    print(
+        len(documents),
+        "personnes importées"
+    )
 
     print("BASE MONGODB CRÉÉE")
 
@@ -196,11 +208,11 @@ def upload_ged():
 
         print("7 - Parsing terminé")
 
-        print("8 - Construction SQLite")
+        print("8 - Construction MongoDB")
 
-        construire_base_sqlite()
+        construire_base_mongodb()
 
-        print("9 - SQLite terminée")
+        print("9 - MongoDB terminée")
 
         print("10 - GEDCOM chargé")
 
