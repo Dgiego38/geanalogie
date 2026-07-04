@@ -203,44 +203,6 @@ def process_blob():
         "success": True
     })
 
-# ------------------------------------------------------------------
-# Menu principal
-# ------------------------------------------------------------------
-@app.route("/process_blob", methods=["POST"])
-def process_blob():
-
-    data = request.get_json()
-
-    blob_url = data["url"]
-
-    print("Blob URL :", blob_url)
-
-    # ici on téléchargera le GEDCOM
-    # puis parsing
-    # puis MongoDB
-
-    return jsonify({
-        "success": True
-    })
-
-@app.route("/menu")
-def accueil():
-    return render_template("index.html")
-
-
-# ------------------------------------------------------------------
-# Page chemin
-# ------------------------------------------------------------------
-
-@app.route("/chemin")
-def chemin():
-
-    parser = get_parser()
-
-    if parser is None:
-        return "Veuillez charger un GEDCOM"
-
-    return render_template("chemin.html")
 
 
 # ------------------------------------------------------------------
