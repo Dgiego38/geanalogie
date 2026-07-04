@@ -31,8 +31,13 @@
 <div id="tree"></div>
 
 <script src="{{ url_for('static', filename='js/tree.js') }}"></script>
+<script>
 
+if(!localStorage.getItem("ged_loaded")){
+    window.location.href = "/";
+}
 
+</script>
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 
 </body>
