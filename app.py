@@ -191,60 +191,46 @@ def upload_ged():
     )
 
     try:
-
         import gzip
-    import shutil
+        import shutil
 
-    fichier.save(temp.name)
+        fichier.save(temp.name)
 
-    if fichier.filename.endswith(".gz"):
+        if fichier.filename.endswith(".gz"):
+            ged_file = temp.name + ".ged"
 
-    ged_file = temp.name + ".ged"
+            with gzip.open(
+                temp.name,
+                "rb"
+            ) as f_in:
+                with open(
+                    ged_file,
+                    "wb"
+                ) as f_out:
+                    shutil.copyfileobj(
+                        f_in,
+                        f_out
+                    )
 
-    with gzip.open(
-        temp.name,
-        "rb"
-    ) as f_in:
+            gedcom_file = ged_file
+        else:
+            gedcom_file = temp.name
 
-        with open(
-            ged_file,
-            "wb"
-        ) as f_out:
-
-            shutil.copyfileobj(
-                f_in,
-                f_out
-            )
-
-    gedcom_file = ged_file
-
-    else:
-
-    gedcom_file = temp.name
-
-
-
-    print("5 - Fichier sauvegardé")
-
-        gedcom_file = temp.name
-
+        print("5 - Fichier sauvegardé")
         print("6 - Début parsing")
 
         gedcom_parser = Parser()
-
         gedcom_parser.parse_file(
             gedcom_file,
             False
         )
 
         print("7 - Parsing terminé")
-
         print("8 - Construction MongoDB")
 
         construire_base_mongodb()
 
         print("9 - MongoDB terminée")
-
         print("10 - GEDCOM chargé")
 
         return jsonify({
@@ -252,12 +238,7 @@ def upload_ged():
         })
 
     except Exception as e:
-
-        print(
-            "ERREUR :",
-            str(e)
-        )
-
+        print("ERREUR :", str(e))
         return jsonify({
             "success": False,
             "message": str(e)
