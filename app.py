@@ -1,12 +1,26 @@
 from flask import Flask, render_template, request, jsonify
 from gedcom.parser import Parser
 from gedcom.element.individual import IndividualElement
+from pymongo import MongoClient
+from datetime import datetime, timedelta
 import tempfile
 import sqlite3
 import os
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
+client = MongoClient(
+    "mongodb+srv://diegogrenados_db_user:w61A5fKRurtQGC2o@genealogie.oxs1uhg.mongodb.net/?appName=genealogie"
+)
+
+db = client.genealogie
+
+persons_collection = db.persons
+
+persons_collection.create_index(
+    "expireAt",
+    expireAfterSeconds=0
+)
 
 # ------------------------------------------------------------------
 # GEDCOM chargé par l'utilisateur
