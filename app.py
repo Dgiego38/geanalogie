@@ -23,6 +23,10 @@ def upload_page():
 def accueil():
     return render_template("index.html")
 
+@app.route("/chemin")
+def chemin():
+    return render_template("chemin.html")
+
 # Route qui reçoit les données parsées par le navigateur
 @app.route("/api/save_data", methods=["POST"])
 def save_data():

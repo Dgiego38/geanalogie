@@ -12,11 +12,9 @@
     <button id="btnImport">Continuer</button>
     <p id="status"></p>
 
-    <!-- Import de la bibliothèque de parsing GEDCOM -->
-    <script type="module">
-        import { parseGedcom } from 'https://ga.jspm.io/npm:gedcom-js@1.0.0/dist/gedcom.js';
-
-        window.importGed = async function () {
+        <script>
+        // Ajout d'un écouteur sur le bouton sans dépendance externe
+        document.getElementById("btnImport").addEventListener("click", async () => {
             const fileInput = document.getElementById("gedFile");
             const file = fileInput.files[0];
             const status = document.getElementById("status");
@@ -30,16 +28,24 @@
             
             reader.onload = async (e) => {
                 try {
-                    status.innerText = "Parsing du GEDCOM (local)...";
+                    status.innerText = "Traitement local en cours...";
+                    const content = e.target.result;
                     
-                    // Parsing local (ne sature pas le serveur)
-                    const gedcomData = e.target.result;
-                    const data = parseGedcom(gedcomData);
-                    const individuals = data.filter(item => item.tag === 'INDI');
+                    // Parsing manuel simplifié des lignes GEDCOM pour extraire les noms
+                    // Cela remplace la bibliothèque gedcom-js qui posait problème
+                    const lines = content.split(/\r?\n/);
+                    const individuals = [];
+                    
+                    let currentName = null;
+                    for (let line of lines) {
+                        if (line.startsWith("1 NAME")) {
+                            currentName = line.substring(7).replace(/\//g, "").trim();
+                            individuals.push({ name: currentName });
+                        }
+                    }
 
-                    status.innerText = "Envoi des données au serveur...";
+                    status.innerText = `Extraction de ${individuals.length} personnes. Envoi...`;
 
-                    // Envoi des données extraites à votre route Flask
                     const response = await fetch("/api/save_data", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -47,21 +53,20 @@
                     });
 
                     if (response.ok) {
-                        status.innerText = "GEDCOM chargé.";
+                        status.innerText = "Terminé !";
                         window.location.href = "/menu";
                     } else {
-                        throw new Error("Erreur lors de l'envoi au serveur");
+                        throw new Error("Erreur lors de l'envoi au serveur.");
                     }
-
                 } catch (err) {
                     console.error(err);
                     status.innerText = "";
-                    alert("Erreur lors du traitement : " + err.message);
+                    alert("Erreur de traitement : " + err.message);
                 }
             };
 
             reader.readAsText(file);
-        };
+        });
     </script>
 </body>
 </html>
