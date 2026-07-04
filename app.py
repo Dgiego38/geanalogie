@@ -182,8 +182,7 @@ def upload_ged():
     )
 
     temp = tempfile.NamedTemporaryFile(
-        delete=False,
-        suffix=".ged"
+    delete=False
     )
 
     print(
@@ -193,9 +192,39 @@ def upload_ged():
 
     try:
 
-        fichier.save(temp.name)
+        import gzip
+    import shutil
 
-        print("5 - Fichier sauvegardé")
+    fichier.save(temp.name)
+
+    if fichier.filename.endswith(".gz"):
+
+    ged_file = temp.name + ".ged"
+
+    with gzip.open(
+        temp.name,
+        "rb"
+    ) as f_in:
+
+        with open(
+            ged_file,
+            "wb"
+        ) as f_out:
+
+            shutil.copyfileobj(
+                f_in,
+                f_out
+            )
+
+    gedcom_file = ged_file
+
+    else:
+
+    gedcom_file = temp.name
+
+
+
+    print("5 - Fichier sauvegardé")
 
         gedcom_file = temp.name
 

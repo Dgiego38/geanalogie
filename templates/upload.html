@@ -1,78 +1,109 @@
-<!DOCTYPE html>
-<html lang="fr">
+https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.jsscript>
 
-<head>
-    <meta charset="UTF-8">
-    <title>Charger un GEDCOM</title>
-        <link rel="stylesheet"
-          href="{{ url_for('static', filename='css/style.css') }}">
-</head>
+<script>
 
-<body>
+async function importGed() {
 
-    <h1>🧬 Importer votre fichier GEDCOM</h1>
+    const file =
+        document.getElementById(
+            "gedFile"
+        ).files[0];
 
-    <input type="file" id="gedFile" accept=".ged">
+    if (!file) {
 
-    <button onclick="importGed()">
-        Continuer
-    </button>
+        alert(
+            "Choisissez un fichier GEDCOM"
+        );
 
-    <p id="status"></p>
+        return;
+    }
 
-    <script>
+    document.getElementById(
+        "status"
+    ).innerText =
+        "Compression du fichier...";
 
-        async function importGed() {
+    try {
 
-            const file = document.getElementById("gedFile").files[0];
+        const buffer =
+            await file.arrayBuffer();
 
-            if (!file) {
-                alert("Choisissez un fichier GEDCOM");
-                return;
-            }
+        const compressed =
+            pako.gzip(
+                new Uint8Array(buffer)
+            );
 
-            document.getElementById("status").innerText =
-                "Chargement du fichier...";
+        console.log(
+            "Taille originale :",
+            file.size
+        );
 
-            const formData = new FormData();
-            formData.append("file", file);
+        console.log(
+            "Taille compressée :",
+            compressed.length
+        );
 
-            try {
+        const blob =
+            new Blob(
+                [compressed],
+                {
+                    type:
+                        "application/gzip"
+                }
+            );
 
-                const response = await fetch("/upload_ged", {
+        const formData =
+            new FormData();
+
+        formData.append(
+            "file",
+            blob,
+            file.name + ".gz"
+        );
+
+        document.getElementById(
+            "status"
+        ).innerText =
+            "Envoi du fichier...";
+
+        const response =
+            await fetch(
+                "/upload_ged",
+                {
                     method: "POST",
                     body: formData
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-
-                    document.getElementById("status").innerText =
-                        "GEDCOM chargé.";
-
-                    window.location.href = "/menu";
-
-                } else {
-
-                    alert(
-                        result.message ||
-                        "Erreur lors du chargement"
-                    );
                 }
+            );
 
-            } catch (e) {
+        const result =
+            await response.json();
 
-                console.error(e);
+        if (result.success) {
 
-                alert(
-                    "Erreur de communication avec le serveur."
-                );
-            }
+            document.getElementById(
+                "status"
+            ).innerText =
+                "GEDCOM chargé.";
+
+            window.location.href =
+                "/menu";
+
+        } else {
+
+            alert(
+                result.message ||
+                "Erreur lors du chargement"
+            );
         }
 
-    </script>
+    } catch (e) {
 
-</body>
+        console.error(e);
 
-</html>
+        alert(
+            "Erreur de communication avec le serveur."
+        );
+    }
+}
+
+</script>
