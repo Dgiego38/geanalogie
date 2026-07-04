@@ -12,8 +12,7 @@
     <button id="btnImport">Continuer</button>
     <p id="status"></p>
 
-        <script>
-        // Ajout d'un écouteur sur le bouton sans dépendance externe
+    <script>
         document.getElementById("btnImport").addEventListener("click", async () => {
             const fileInput = document.getElementById("gedFile");
             const file = fileInput.files[0];
@@ -24,40 +23,45 @@
                 return;
             }
 
+            // Génération d'un ID de session unique
+            const sessionId = crypto.randomUUID();
+
             const reader = new FileReader();
             
             reader.onload = async (e) => {
                 try {
-                    status.innerText = "Traitement local en cours...";
-                    const content = e.target.result;
-                    
-                    // Parsing manuel simplifié des lignes GEDCOM pour extraire les noms
-                    // Cela remplace la bibliothèque gedcom-js qui posait problème
-                    const lines = content.split(/\r?\n/);
+                    status.innerText = "Parsing local...";
+                    const lines = e.target.result.split(/\r?\n/);
                     const individuals = [];
                     
-                    let currentName = null;
                     for (let line of lines) {
                         if (line.startsWith("1 NAME")) {
-                            currentName = line.substring(7).replace(/\//g, "").trim();
-                            individuals.push({ name: currentName });
+                            individuals.push({ name: line.substring(7).replace(/\//g, "").trim() });
                         }
                     }
 
-                    status.innerText = `Extraction de ${individuals.length} personnes. Envoi...`;
+                    // Envoi par lots (batches) pour éviter l'erreur 413
+                    const batchSize = 200;
+                    for (let i = 0; i < individuals.length; i += batchSize) {
+                        const batch = individuals.slice(i, i + batchSize);
+                        
+                        status.innerText = `Envoi du lot ${i / batchSize + 1}... (${i + batch.length}/${individuals.length})`;
 
-                    const response = await fetch("/api/save_data", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ individuals: individuals })
-                    });
+                        const response = await fetch("/api/save_data", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ 
+                                sessionId: sessionId, 
+                                individuals: batch,
+                                isFirstBatch: (i === 0) // Indique au serveur de nettoyer l'ancienne session
+                            })
+                        });
 
-                    if (response.ok) {
-                        status.innerText = "Terminé !";
-                        window.location.href = "/menu";
-                    } else {
-                        throw new Error("Erreur lors de l'envoi au serveur.");
+                        if (!response.ok) throw new Error("Erreur serveur au lot " + i);
                     }
+
+                    status.innerText = "Terminé ! Redirection...";
+                    window.location.href = "/menu?sessionId=" + sessionId;
                 } catch (err) {
                     console.error(err);
                     status.innerText = "";
