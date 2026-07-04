@@ -22,6 +22,7 @@ persons_collection.create_index(
     "expireAt",
     expireAfterSeconds=0
 )
+app = Flask(__name__)
 
 # ------------------------------------------------------------------
 # GEDCOM chargé par l'utilisateur
