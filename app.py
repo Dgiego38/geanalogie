@@ -10,6 +10,31 @@ app = Flask(__name__)
 # ------------------------------------------------------------------
 
 gedcom_parser = None
+gedcom_file = None
+
+
+def get_parser():
+
+    global gedcom_parser
+    global gedcom_file
+
+    if gedcom_parser is None and gedcom_file:
+
+        try:
+            gedcom_parser = Parser()
+            gedcom_parser.parse_file(
+                gedcom_file,
+                False
+            )
+
+            print("GEDCOM rechargé")
+
+        except Exception as e:
+
+            print(e)
+            return None
+
+    return gedcom_parser
 
 
 # ------------------------------------------------------------------
@@ -25,10 +50,12 @@ def upload_page():
 def upload_ged():
 
     global gedcom_parser
+    global gedcom_file
 
     fichier = request.files.get("file")
 
     if not fichier:
+
         return jsonify({
             "success": False,
             "message": "Aucun fichier reçu"
@@ -41,12 +68,19 @@ def upload_ged():
 
     fichier.save(temp.name)
 
+    gedcom_file = temp.name
+
     gedcom_parser = Parser()
-    gedcom_parser.parse_file(temp.name, False)
+    gedcom_parser.parse_file(
+        gedcom_file,
+        False
+    )
 
     print("GEDCOM chargé")
 
-    return jsonify({"success": True})
+    return jsonify({
+        "success": True
+    })
 
 
 # ------------------------------------------------------------------
@@ -65,7 +99,9 @@ def accueil():
 @app.route("/chemin")
 def chemin():
 
-    if gedcom_parser is None:
+    parser = get_parser()
+
+    if parser is None:
         return "Veuillez charger un GEDCOM"
 
     return render_template("chemin.html")
@@ -78,9 +114,9 @@ def chemin():
 @app.route("/chemin_result")
 def chemin_result():
 
-    global gedcom_parser
+    parser = get_parser()
 
-    if gedcom_parser is None:
+    if parser is None:
         return jsonify([])
 
     person1 = request.args.get("person1")
@@ -89,9 +125,12 @@ def chemin_result():
     p1 = None
     p2 = None
 
-    for indiv in gedcom_parser.get_root_child_elements():
+    for indiv in parser.get_root_child_elements():
 
-        if isinstance(indiv, IndividualElement):
+        if isinstance(
+            indiv,
+            IndividualElement
+        ):
 
             prenom, nom = indiv.get_name()
             full = f"{prenom} {nom}"
@@ -105,7 +144,8 @@ def chemin_result():
     if p1 and p2:
 
         try:
-            nodes = gedcom_parser.display_relationship_path(
+
+            nodes = parser.display_relationship_path(
                 p1,
                 p2
             )
@@ -128,9 +168,9 @@ def chemin_result():
 @app.route("/api/personnes")
 def api_personnes():
 
-    global gedcom_parser
+    parser = get_parser()
 
-    if gedcom_parser is None:
+    if parser is None:
         return jsonify([])
 
     q = request.args.get(
@@ -140,7 +180,7 @@ def api_personnes():
 
     personnes = []
 
-    for indiv in gedcom_parser.get_root_child_elements():
+    for indiv in parser.get_root_child_elements():
 
         if isinstance(
             indiv,
@@ -163,18 +203,21 @@ def api_personnes():
 @app.route("/personne")
 def personne():
 
-    global gedcom_parser
+    parser = get_parser()
 
-    if gedcom_parser is None:
+    if parser is None:
         return "Veuillez charger un GEDCOM"
 
     nom_complet = request.args.get("nom")
 
     personne = None
 
-    for indiv in gedcom_parser.get_root_child_elements():
+    for indiv in parser.get_root_child_elements():
 
-        if isinstance(indiv, IndividualElement):
+        if isinstance(
+            indiv,
+            IndividualElement
+        ):
 
             prenom, nom = indiv.get_name()
             full = f"{prenom} {nom}"
@@ -196,7 +239,7 @@ def personne():
 
     try:
 
-        parents = gedcom_parser.get_parents(
+        parents = parser.get_parents(
             personne,
             "ALL"
         )
@@ -214,7 +257,7 @@ def personne():
 
     try:
 
-        enfants = gedcom_parser.get_enfants(
+        enfants = parser.get_enfants(
             personne,
             "ALL"
         )
