@@ -27,22 +27,29 @@ def accueil():
 def chemin():
     return render_template("chemin.html")
 
-# Route qui reçoit les données parsées par le navigateur
+# Route qui reçoit les données parsées par lots (batches)
 @app.route("/api/save_data", methods=["POST"])
 def save_data():
     data = request.get_json()
+    session_id = data.get("sessionId")
     individuals = data.get("individuals", [])
+    is_first_batch = data.get("isFirstBatch", False)
+    
+    # Si c'est le premier lot, on nettoie les anciennes données de cette session
+    if is_first_batch:
+        persons_collection.delete_many({"sessionId": session_id})
     
     expire_at = datetime.utcnow() + timedelta(hours=1)
-    documents = []
     
-    for ind in individuals:
-        # 'name' est extrait côté client par gedcom-js
-        name = ind.get('name', 'Inconnu')
-        documents.append({
-            "fullname": name,
+    # Préparation des documents avec le sessionId
+    documents = [
+        {
+            "fullname": ind.get('name', 'Inconnu'), 
+            "sessionId": session_id, 
             "expireAt": expire_at
-        })
+        } 
+        for ind in individuals
+    ]
     
     if documents:
         persons_collection.insert_many(documents)
@@ -51,8 +58,15 @@ def save_data():
 
 @app.route("/api/personnes")
 def api_personnes():
+    session_id = request.args.get("sessionId")
     q = request.args.get("q", "")
-    cursor = persons_collection.find({"fullname": {"$regex": q, "$options": "i"}}).limit(10)
+    
+    # Recherche filtrée par sessionId pour isoler les utilisateurs
+    cursor = persons_collection.find({
+        "sessionId": session_id, 
+        "fullname": {"$regex": q, "$options": "i"}
+    }).limit(10)
+    
     return jsonify([doc["fullname"] for doc in cursor])
 
 if __name__ == "__main__":
