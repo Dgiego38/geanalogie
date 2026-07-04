@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <title>Charger un GEDCOM</title>
 
-    {{ url_for('static', filename='css/style.css') }}
+    <link rel="stylesheet"
+          href="{.css') }}
 </head>
 
 <body>
@@ -20,98 +21,102 @@
 
     <p id="status"></p>
 
-    <script>
+    <script type="module">
 
-    async function importGed() {
+        import { upload } from "https://esm.sh/@vercel/blob/client";
 
-        const file =
-            document.getElementById(
-                "gedFile"
-            ).files[0];
+        window.importGed = async function () {
 
-        if (!file) {
+            const file =
+                document.getElementById(
+                    "gedFile"
+                ).files[0];
 
-            alert(
-                "Choisissez un fichier GEDCOM"
-            );
+            if (!file) {
 
-            return;
-        }
-
-        document.getElementById(
-            "status"
-        ).innerText =
-            "Upload vers Blob...";
-
-        try {
-
-            const response =
-                await fetch(
-                    "/api/upload",
-                    {
-                        method: "POST",
-                        headers: {
-                            "content-type":
-                                file.type ||
-                                "application/octet-stream"
-                        },
-                        body: file
-                    }
+                alert(
+                    "Choisissez un fichier GEDCOM"
                 );
 
-            const blob =
-                await response.json();
+                return;
+            }
 
-            document.getElementById(
-                "status"
-            ).innerText =
-                "Traitement du GEDCOM...";
-
-            const processResponse =
-                await fetch(
-                    "/process_blob",
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-Type":
-                                "application/json"
-                        },
-                        body: JSON.stringify({
-                            url: blob.url
-                        })
-                    }
-                );
-
-            const result =
-                await processResponse.json();
-
-            if (result.success) {
+            try {
 
                 document.getElementById(
                     "status"
                 ).innerText =
-                    "GEDCOM chargé.";
+                    "Upload vers Blob...";
 
-                window.location.href =
-                    "/menu";
+                const blob =
+                    await upload(
+                        file.name,
+                        file,
+                        {
+                            access: "public",
 
-            } else {
+                            handleUploadUrl:
+                                "/api/upload"
+                        }
+                    );
+
+                console.log(
+                    "Blob URL :",
+                    blob.url
+                );
+
+                document.getElementById(
+                    "status"
+                ).innerText =
+                    "Traitement du GEDCOM...";
+
+                const response =
+                    await fetch(
+                        "/process_blob",
+                        {
+                            method: "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body: JSON.stringify({
+                                url: blob.url
+                            })
+                        }
+                    );
+
+                const result =
+                    await response.json();
+
+                if (result.success) {
+
+                    document.getElementById(
+                        "status"
+                    ).innerText =
+                        "GEDCOM chargé.";
+
+                    window.location.href =
+                        "/menu";
+
+                } else {
+
+                    alert(
+                        result.message ||
+                        "Erreur"
+                    );
+                }
+
+            } catch (e) {
+
+                console.error(e);
 
                 alert(
-                    result.message ||
-                    "Erreur"
+                    "Erreur de communication avec le serveur."
                 );
             }
-
-        } catch (e) {
-
-            console.error(e);
-
-            alert(
-                "Erreur de communication avec le serveur."
-            );
-        }
-    }
+        };
 
     </script>
 

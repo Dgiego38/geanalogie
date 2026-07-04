@@ -3,10 +3,11 @@ from gedcom.parser import Parser
 from gedcom.element.individual import IndividualElement
 from pymongo import MongoClient
 from datetime import datetime, timedelta
-import tempfile
-import sqlite3
-import os
 from dotenv import load_dotenv
+
+import tempfile
+import requests
+import os
 
 app = Flask(__name__)
 
@@ -31,10 +32,8 @@ persons_collection.create_index(
 # ------------------------------------------------------------------
 
 gedcom_parser = None
-gedcom_file = None
-def construire_base_mongodb():
 
-    persons_collection.delete_many({})
+def construire_base_mongodb():
 
     expire_at = (
         datetime.utcnow()
@@ -154,96 +153,55 @@ def get_parser():
 
 @app.route("/")
 def upload_page():
-    return render_template("upload.html")
+    return render_template(
+        "upload.html"
+    )   
 
 
-@app.route("/upload_ged", methods=["POST"])
-def upload_ged():
+@app.route(
+    "/process_blob",
+    methods=["POST"]
+)
+def process_blob():
 
     global gedcom_parser
-    global gedcom_file
 
-    print("1 - Route upload appelée")
+    data = request.get_json()
 
-    fichier = request.files.get("file")
-
-    if not fichier:
-
-        print("2 - Aucun fichier reçu")
-
-        return jsonify({
-            "success": False,
-            "message": "Aucun fichier reçu"
-        })
-
-    print(
-        "3 - Fichier reçu :",
-        fichier.filename
-    )
+    blob_url = data["url"]
 
     temp = tempfile.NamedTemporaryFile(
-    delete=False
+        delete=False,
+        suffix=".ged"
     )
 
-    print(
-        "4 - Temp créé :",
+    r = requests.get(blob_url)
+
+    with open(
+        temp.name,
+        "wb"
+    ) as f:
+
+        f.write(
+            r.content
+        )
+
+    gedcom_parser = Parser()
+
+    gedcom_parser.parse_file(
+        temp.name,
+        False
+    )
+
+    construire_base_mongodb()
+
+    os.remove(
         temp.name
     )
 
-    try:
-        import gzip
-        import shutil
-
-        fichier.save(temp.name)
-
-        if fichier.filename.endswith(".gz"):
-            ged_file = temp.name + ".ged"
-
-            with gzip.open(
-                temp.name,
-                "rb"
-            ) as f_in:
-                with open(
-                    ged_file,
-                    "wb"
-                ) as f_out:
-                    shutil.copyfileobj(
-                        f_in,
-                        f_out
-                    )
-
-            gedcom_file = ged_file
-        else:
-            gedcom_file = temp.name
-
-        print("5 - Fichier sauvegardé")
-        print("6 - Début parsing")
-
-        gedcom_parser = Parser()
-        gedcom_parser.parse_file(
-            gedcom_file,
-            False
-        )
-
-        print("7 - Parsing terminé")
-        print("8 - Construction MongoDB")
-
-        construire_base_mongodb()
-
-        print("9 - MongoDB terminée")
-        print("10 - GEDCOM chargé")
-
-        return jsonify({
-            "success": True
-        })
-
-    except Exception as e:
-        print("ERREUR :", str(e))
-        return jsonify({
-            "success": False,
-            "message": str(e)
-        })
-
+    return jsonify({
+        "success": True
+    })
 
 # ------------------------------------------------------------------
 # Menu principal
