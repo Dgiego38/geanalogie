@@ -9,6 +9,8 @@ import sqlite3
 import os
 from dotenv import load_dotenv
 
+app = Flask(__name__)
+
 load_dotenv()
 
 client = MongoClient(
@@ -23,7 +25,7 @@ persons_collection.create_index(
     "expireAt",
     expireAfterSeconds=0
 )
-app = Flask(__name__)
+
 
 # ------------------------------------------------------------------
 # GEDCOM chargé par l'utilisateur
