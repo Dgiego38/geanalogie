@@ -23,9 +23,7 @@
                 return;
             }
 
-            // Génération d'un ID de session unique
             const sessionId = crypto.randomUUID();
-
             const reader = new FileReader();
             
             reader.onload = async (e) => {
@@ -40,25 +38,44 @@
                         }
                     }
 
-                    // Envoi par lots (batches) pour éviter l'erreur 413
-                    const batchSize = 200;
+                    // VITESSE : Batch de 5000 + exécution parallèle par paquets de 5
+                    const batchSize = 5000;
+                    const tasks = [];
+                    
                     for (let i = 0; i < individuals.length; i += batchSize) {
                         const batch = individuals.slice(i, i + batchSize);
                         
-                        status.innerText = `Envoi du lot ${i / batchSize + 1}... (${i + batch.length}/${individuals.length})`;
-
-                        const response = await fetch("/api/save_data", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ 
+                        // Création de la tâche d'envoi parallèle
+                        const task = (async () => {
+                            const blob = new Blob([JSON.stringify({ 
                                 sessionId: sessionId, 
                                 individuals: batch,
-                                isFirstBatch: (i === 0) // Indique au serveur de nettoyer l'ancienne session
-                            })
-                        });
+                                isFirstBatch: (i === 0) 
+                            })]);
+                            const compressedStream = blob.stream().pipeThrough(new CompressionStream("gzip"));
+                            const compressedBlob = await new Response(compressedStream).blob();
 
-                        if (!response.ok) throw new Error("Erreur serveur au lot " + i);
+                            const response = await fetch("/api/save_data", {
+                                method: "POST",
+                                headers: { 
+                                    "Content-Type": "application/json",
+                                    "Content-Encoding": "gzip" 
+                                },
+                                body: compressedBlob
+                            });
+                            if (!response.ok) throw new Error("Erreur serveur au lot " + i);
+                        })();
+
+                        tasks.push(task);
+                        status.innerText = `Envoi parallèle : ${i + batch.length} / ${individuals.length}`;
+
+                        // On limite à 5 requêtes simultanées pour ne pas saturer Vercel
+                        if (tasks.length >= 5) {
+                            await Promise.all(tasks);
+                            tasks.length = 0;
+                        }
                     }
+                    await Promise.all(tasks); // Finalisation des derniers lots
 
                     status.innerText = "Terminé ! Redirection...";
                     window.location.href = "/menu?sessionId=" + sessionId;

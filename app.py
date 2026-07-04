@@ -3,6 +3,8 @@ from pymongo import MongoClient
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import os
+import gzip
+import json
 
 app = Flask(__name__)
 load_dotenv()
@@ -14,6 +16,8 @@ persons_collection = db.persons
 
 # Index TTL pour suppression auto après 1 heure
 persons_collection.create_index("expireAt", expireAfterSeconds=0)
+# Index pour accélérer les recherches par session
+persons_collection.create_index("sessionId") 
 
 @app.route("/")
 def upload_page():
@@ -27,10 +31,14 @@ def accueil():
 def chemin():
     return render_template("chemin.html")
 
-# Route qui reçoit les données parsées par lots (batches)
+# Route qui reçoit les données compressées (GZIP) et parsées par lots
 @app.route("/api/save_data", methods=["POST"])
 def save_data():
-    data = request.get_json()
+    # Décompression manuelle du flux GZIP reçu
+    compressed_data = request.data
+    decompressed_data = gzip.decompress(compressed_data)
+    data = json.loads(decompressed_data.decode('utf-8'))
+    
     session_id = data.get("sessionId")
     individuals = data.get("individuals", [])
     is_first_batch = data.get("isFirstBatch", False)
@@ -61,7 +69,7 @@ def api_personnes():
     session_id = request.args.get("sessionId")
     q = request.args.get("q", "")
     
-    # Recherche filtrée par sessionId pour isoler les utilisateurs
+    # Recherche filtrée par sessionId pour isoler les utilisateurs[cite: 2]
     cursor = persons_collection.find({
         "sessionId": session_id, 
         "fullname": {"$regex": q, "$options": "i"}
