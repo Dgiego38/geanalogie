@@ -3,7 +3,6 @@ from gedcom.parser import Parser
 from gedcom.element.individual import IndividualElement
 from pymongo import MongoClient
 from datetime import datetime, timedelta
-import { Analytics } from "@vercel/analytics/next"
 import tempfile
 import sqlite3
 import os
