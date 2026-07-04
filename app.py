@@ -81,7 +81,6 @@ def construire_base_mongodb():
 
     print("BASE MONGODB CRÉÉE")
 
-def construire_base_sqlite():
 
     if os.path.exists("genealogie.db"):
         os.remove("genealogie.db")
@@ -123,12 +122,9 @@ def construire_base_sqlite():
 
     print("BASE SQLITE CRÉÉE")
 
-def get_parser():
+    def get_parser():
+        return gedcom_parser
 
-    global gedcom_parser
-    global gedcom_file
-
-    if gedcom_parser is None and gedcom_file:
 
         try:
             gedcom_parser = Parser()
@@ -203,7 +199,11 @@ def process_blob():
         "success": True
     })
 
-
+@app.route("/menu")
+def accueil():
+    return render_template(
+        "index.html"
+    )
 
 # ------------------------------------------------------------------
 # Recherche de chemin
