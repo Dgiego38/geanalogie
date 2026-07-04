@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <title>Charger un GEDCOM</title>
-    <!-- Correction : ajout de la balise <link> pour le CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -13,8 +12,9 @@
     <button onclick="importGed()">Continuer</button>
     <p id="status"></p>
 
+    <!-- Import de la bibliothèque de parsing GEDCOM -->
     <script type="module">
-        import { upload } from "https://esm.sh/@vercel/blob/client";
+        import { parseGedcom } from 'https://cdn.skypack.dev/gedcom-js';
 
         window.importGed = async function () {
             const fileInput = document.getElementById("gedFile");
@@ -26,38 +26,41 @@
                 return;
             }
 
-            try {
-                status.innerText = "Upload vers Blob...";
+            const reader = new FileReader();
+            
+            reader.onload = async (e) => {
+                try {
+                    status.innerText = "Parsing du GEDCOM (local)...";
+                    
+                    // Parsing local (ne sature pas le serveur)
+                    const gedcomData = e.target.result;
+                    const data = parseGedcom(gedcomData);
+                    const individuals = data.filter(item => item.tag === 'INDI');
 
-                // Upload direct vers Vercel Blob
-                const blob = await upload(file.name, file, {
-                    access: "public",
-                    handleUploadUrl: "/api/upload"
-                });
+                    status.innerText = "Envoi des données au serveur...";
 
-                status.innerText = "Traitement du GEDCOM...";
+                    // Envoi des données extraites à votre route Flask
+                    const response = await fetch("/api/save_data", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ individuals: individuals })
+                    });
 
-                // Notification serveur
-                const response = await fetch("/process_blob", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ url: blob.url })
-                });
+                    if (response.ok) {
+                        status.innerText = "GEDCOM chargé.";
+                        window.location.href = "/menu";
+                    } else {
+                        throw new Error("Erreur lors de l'envoi au serveur");
+                    }
 
-                const result = await response.json();
-
-                if (response.ok && result.success) {
-                    status.innerText = "GEDCOM chargé.";
-                    window.location.href = "/menu";
-                } else {
-                    throw new Error(result.error || "Erreur lors du traitement");
+                } catch (err) {
+                    console.error(err);
+                    status.innerText = "";
+                    alert("Erreur lors du traitement : " + err.message);
                 }
+            };
 
-            } catch (e) {
-                console.error(e);
-                status.innerText = "";
-                alert("Erreur : " + e.message);
-            }
+            reader.readAsText(file);
         };
     </script>
 </body>
