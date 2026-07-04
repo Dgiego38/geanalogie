@@ -2,3 +2,4 @@ Flask
 python-gedcom
 pymongo
 python-dotenv
+requests
