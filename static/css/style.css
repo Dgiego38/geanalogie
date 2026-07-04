@@ -1,110 +1,307 @@
+/* ------------------------- */
+/* Base */
+/* ------------------------- */
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
 body{
 
-    margin:0;
+    font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "SF Pro Display",
+        "Segoe UI",
+        sans-serif;
 
-    font-family:Arial;
+    min-height:100vh;
 
-    background:#f3f5f8;
+    background:
+        linear-gradient(
+            135deg,
+            #dff1ff 0%,
+            #eef3ff 40%,
+            #ffffff 100%
+        );
 
+    color:#1d1d1f;
+
+    overflow-x:hidden;
 }
+
+/* ------------------------- */
+/* Sidebar */
+/* ------------------------- */
 
 .menu{
 
     position:fixed;
 
-    left:0;
+    top:20px;
+    left:20px;
+    bottom:20px;
 
-    top:0;
+    width:280px;
 
-    width:260px;
+    padding:24px;
 
-    height:100vh;
+    border-radius:30px;
 
-    background:#243447;
+    backdrop-filter:blur(30px);
+    -webkit-backdrop-filter:blur(30px);
 
-    color:white;
+    background:
+        rgba(255,255,255,.28);
 
-    padding:20px;
+    border:
+        1px solid rgba(255,255,255,.45);
 
+    box-shadow:
+        0 20px 50px rgba(0,0,0,.08),
+        inset 0 1px 0 rgba(255,255,255,.6);
+
+    display:flex;
+    flex-direction:column;
 }
+
+/* ------------------------- */
+/* Titre */
+/* ------------------------- */
 
 .menu h2{
 
     text-align:center;
 
+    font-size:28px;
+
+    font-weight:700;
+
+    margin-bottom:30px;
+
+    letter-spacing:-0.03em;
+}
+
+/* ------------------------- */
+/* Boutons Apple */
+/* ------------------------- */
+
+.menu a{
+    text-decoration:none;
 }
 
 .menu button{
 
     width:100%;
 
-    padding:12px;
-
-    margin-top:10px;
-
     border:none;
 
-    border-radius:6px;
+    padding:16px;
+
+    margin-bottom:12px;
 
     cursor:pointer;
 
-    background:#4CAF50;
+    border-radius:18px;
 
-    color:white;
+    color:#111;
 
     font-size:15px;
 
+    font-weight:600;
+
+    background:
+        rgba(255,255,255,.55);
+
+    backdrop-filter:blur(15px);
+
+    box-shadow:
+        0 4px 15px rgba(0,0,0,.08),
+        inset 0 1px 0 rgba(255,255,255,.9);
+
+    transition:
+        all .25s ease;
 }
 
 .menu button:hover{
 
-    background:#3d9440;
+    transform:
+        translateY(-3px)
+        scale(1.02);
 
+    background:
+        rgba(255,255,255,.8);
+
+    box-shadow:
+        0 10px 25px rgba(0,0,0,.12);
 }
 
-.suggestion {
-    background: white;
-    padding: 8px;
-    border: 1px solid #ddd;
-    cursor: pointer;
+.menu button:active{
+
+    transform:scale(.98);
 }
 
-.suggestion:hover {
-    background: #e9f5ff;
-}
+/* ------------------------- */
+/* Zone principale */
+/* ------------------------- */
 
-#tree {
-    margin-top: 30px;
-}
-
-.node {
-    background: #4caf50;
-    color: white;
-    padding: 8px 12px;
-    margin: 5px;
-    border-radius: 8px;
-    display: inline-block;
-}
-
-.root {
-    background: #1f2a44;
-    color: white;
-    padding: 10px 14px;
-    margin: 5px;
-    border-radius: 10px;
-    font-weight: bold;
-}
-
-.line {
-    width: 2px;
-    height: 20px;
-    background: #999;
-    margin-left: 20px;
-}
 .contenu{
 
-    margin-left:300px;
+    margin-left:340px;
 
-    padding:40px;
+    padding:60px;
 
+    min-height:100vh;
+}
+
+.contenu h1{
+
+    font-size:54px;
+
+    font-weight:800;
+
+    letter-spacing:-0.05em;
+
+    margin-bottom:20px;
+}
+
+.contenu p{
+
+    font-size:18px;
+
+    color:#555;
+
+    max-width:700px;
+
+    line-height:1.7;
+}
+
+/* ------------------------- */
+/* Suggestions */
+/* ------------------------- */
+
+.suggestion{
+
+    margin-top:4px;
+
+    padding:12px 15px;
+
+    border-radius:14px;
+
+    background:
+        rgba(255,255,255,.65);
+
+    backdrop-filter:blur(20px);
+
+    cursor:pointer;
+
+    transition:.2s;
+
+    border:
+        1px solid rgba(255,255,255,.4);
+}
+
+.suggestion:hover{
+
+    transform:translateX(5px);
+
+    background:
+        rgba(255,255,255,.95);
+}
+
+/* ------------------------- */
+/* Arbre */
+/* ------------------------- */
+
+#tree{
+    margin-top:40px;
+}
+
+.node{
+
+    display:inline-block;
+
+    padding:12px 18px;
+
+    margin:8px;
+
+    border-radius:18px;
+
+    background:
+        rgba(255,255,255,.7);
+
+    backdrop-filter:blur(20px);
+
+    box-shadow:
+        0 8px 20px rgba(0,0,0,.08);
+
+    color:#222;
+}
+
+.root{
+
+    display:inline-block;
+
+    padding:14px 22px;
+
+    margin:8px;
+
+    border-radius:22px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #007aff,
+            #66a3ff
+        );
+
+    color:white;
+
+    font-weight:700;
+
+    box-shadow:
+        0 10px 25px rgba(0,122,255,.35);
+}
+
+.line{
+
+    width:2px;
+    height:25px;
+
+    margin-left:25px;
+
+    background:
+        rgba(120,120,120,.35);
+}
+
+/* ------------------------- */
+/* Responsive */
+/* ------------------------- */
+
+@media(max-width:900px){
+
+    .menu{
+
+        position:relative;
+
+        width:auto;
+
+        margin:15px;
+
+        bottom:auto;
+    }
+
+    .contenu{
+
+        margin-left:0;
+
+        padding:25px;
+    }
+
+    .contenu h1{
+
+        font-size:38px;
+    }
 }
