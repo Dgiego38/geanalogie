@@ -199,11 +199,11 @@ def process_blob():
         "success": True
     })
 
-@app.route("/menu")
-def accueil():
-    return render_template(
-        "index.html"
-    )
+    @app.route("/menu")
+    def accueil():
+        return render_template(
+            "index.html"
+        )
 
 # ------------------------------------------------------------------
 # Recherche de chemin
