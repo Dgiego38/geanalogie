@@ -55,7 +55,10 @@ async function importGed() {
 
         const compressed =
             pako.gzip(
-                new Uint8Array(buffer)
+                new Uint8Array(buffer),
+        {
+            level: 9
+        }
             );
 
         console.log(
