@@ -6,11 +6,12 @@ from datetime import datetime, timedelta
 import tempfile
 import sqlite3
 import os
+from dotenv import load_dotenv
 
-app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
+load_dotenv()
+
 client = MongoClient(
-    "mongodb+srv://diegogrenados_db_user:w61A5fKRurtQGC2o@genealogie.oxs1uhg.mongodb.net/?appName=genealogie"
+    os.getenv("MONGODB_URI")
 )
 
 db = client.genealogie
@@ -28,6 +29,43 @@ persons_collection.create_index(
 
 gedcom_parser = None
 gedcom_file = None
+def construire_base_mongodb():
+
+    persons_collection.delete_many({})
+
+    expire_at = (
+        datetime.utcnow() +
+        timedelta(hours=1)
+    )
+
+    for indiv in gedcom_parser.get_root_child_elements():
+
+        if isinstance(
+            indiv,
+            IndividualElement
+        ):
+
+            try:
+
+                prenom, nom = indiv.get_name()
+
+                persons_collection.insert_one({
+
+                    "id":
+                        indiv.get_pointer(),
+
+                    "fullname":
+                        f"{prenom} {nom}",
+
+                    "expireAt":
+                        expire_at
+
+                })
+
+            except:
+                pass
+
+    print("BASE MONGODB CRÉÉE")
 
 def construire_base_sqlite():
 
@@ -272,27 +310,22 @@ def api_personnes():
         ""
     )
 
-    conn = sqlite3.connect(
-        "genealogie.db"
-    )
+    personnes = []
 
-    cur = conn.cursor()
+    cursor = persons_collection.find(
+        {
+            "fullname": {
+                "$regex": q,
+                "$options": "i"
+            }
+        }
+    ).limit(10)
 
-    cur.execute("""
-        SELECT fullname
-        FROM persons
-        WHERE fullname LIKE ?
-        LIMIT 10
-    """, (
-        f"%{q}%",
-    ))
+    for doc in cursor:
 
-    personnes = [
-        row[0]
-        for row in cur.fetchall()
-    ]
-
-    conn.close()
+        personnes.append(
+            doc["fullname"]
+        )
 
     return jsonify(personnes)
 
@@ -373,7 +406,6 @@ def personne():
         pass
 
     return html
-
 
 # ------------------------------------------------------------------
 # Lancement local
