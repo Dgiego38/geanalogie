@@ -248,6 +248,22 @@ def upload_ged():
 # ------------------------------------------------------------------
 # Menu principal
 # ------------------------------------------------------------------
+@app.route("/process_blob", methods=["POST"])
+def process_blob():
+
+    data = request.get_json()
+
+    blob_url = data["url"]
+
+    print("Blob URL :", blob_url)
+
+    # ici on téléchargera le GEDCOM
+    # puis parsing
+    # puis MongoDB
+
+    return jsonify({
+        "success": True
+    })
 
 @app.route("/menu")
 def accueil():

@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Charger un GEDCOM</title>
-        <link rel="stylesheet"
-          href="{{ url_for('static', filename='css/style.css') }}">
+
+    {{ url_for('static', filename='css/style.css') }}
 </head>
 
 <body>
@@ -20,121 +20,100 @@
 
     <p id="status"></p>
 
-<script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+    <script>
 
-<script>
-console.log("PAKO =", pako);
-</script>
-<script>
+    async function importGed() {
 
-async function importGed() {
+        const file =
+            document.getElementById(
+                "gedFile"
+            ).files[0];
 
-    const file =
-        document.getElementById(
-            "gedFile"
-        ).files[0];
+        if (!file) {
 
-    if (!file) {
+            alert(
+                "Choisissez un fichier GEDCOM"
+            );
 
-        alert(
-            "Choisissez un fichier GEDCOM"
-        );
-
-        return;
-    }
-
-    document.getElementById(
-        "status"
-    ).innerText =
-        "Compression du fichier...";
-
-    try {
-
-        const buffer =
-            await file.arrayBuffer();
-
-        const compressed =
-            pako.gzip(
-                new Uint8Array(buffer),
-        {
-            level: 9
+            return;
         }
-            );
-
-        console.log(
-            "Taille originale (Mo)",
-            (file.size / 1024 / 1024).toFixed(2)
-        );
-
-        console.log(
-            "Taille compressée (Mo)",
-            (compressed.length / 1024 / 1024).toFixed(2)
-        );
-
-        const blob =
-            new Blob(
-                [compressed],
-                {
-                    type:
-                        "application/gzip"
-                }
-            );
-
-        const formData =
-            new FormData();
-
-        formData.append(
-            "file",
-            blob,
-            file.name + ".gz"
-        );
 
         document.getElementById(
             "status"
         ).innerText =
-            "Envoi du fichier...";
+            "Upload vers Blob...";
 
-        const response =
-            await fetch(
-                "/upload_ged",
-                {
-                    method: "POST",
-                    body: formData
-                }
-            );
+        try {
 
-        const result =
-            await response.json();
+            const response =
+                await fetch(
+                    "/api/upload",
+                    {
+                        method: "POST",
+                        headers: {
+                            "content-type":
+                                file.type ||
+                                "application/octet-stream"
+                        },
+                        body: file
+                    }
+                );
 
-        if (result.success) {
+            const blob =
+                await response.json();
 
             document.getElementById(
                 "status"
             ).innerText =
-                "GEDCOM chargé.";
+                "Traitement du GEDCOM...";
 
-            window.location.href =
-                "/menu";
+            const processResponse =
+                await fetch(
+                    "/process_blob",
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+                        body: JSON.stringify({
+                            url: blob.url
+                        })
+                    }
+                );
 
-        } else {
+            const result =
+                await processResponse.json();
+
+            if (result.success) {
+
+                document.getElementById(
+                    "status"
+                ).innerText =
+                    "GEDCOM chargé.";
+
+                window.location.href =
+                    "/menu";
+
+            } else {
+
+                alert(
+                    result.message ||
+                    "Erreur"
+                );
+            }
+
+        } catch (e) {
+
+            console.error(e);
 
             alert(
-                result.message ||
-                "Erreur lors du chargement"
+                "Erreur de communication avec le serveur."
             );
         }
-
-    } catch (e) {
-
-        console.error(e);
-
-        alert(
-            "Erreur de communication avec le serveur."
-        );
     }
-}
 
-</script>
+    </script>
 
 </body>
 
