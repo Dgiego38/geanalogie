@@ -1,3 +1,25 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Charger un GEDCOM</title>
+        <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+    <h1>🧬 Importer votre fichier GEDCOM</h1>
+
+    <input type="file" id="gedFile" accept=".ged">
+
+    <button onclick="importGed()">
+        Continuer
+    </button>
+
+    <p id="status"></p>
+
 <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 
 <script>
@@ -37,13 +59,13 @@ async function importGed() {
             );
 
         console.log(
-            "Taille originale :",
-            file.size
+            "Taille originale (Mo)",
+            (file.size / 1024 / 1024).toFixed(2)
         );
 
         console.log(
-            "Taille compressée :",
-            compressed.length
+            "Taille compressée (Mo)",
+            (compressed.length / 1024 / 1024).toFixed(2)
         );
 
         const blob =
@@ -110,3 +132,7 @@ async function importGed() {
 }
 
 </script>
+
+</body>
+
+</html>
