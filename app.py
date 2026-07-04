@@ -6,6 +6,7 @@ import sqlite3
 import os
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
 
 # ------------------------------------------------------------------
 # GEDCOM chargé par l'utilisateur
@@ -95,36 +96,76 @@ def upload_ged():
     global gedcom_parser
     global gedcom_file
 
+    print("1 - Route upload appelée")
+
     fichier = request.files.get("file")
 
     if not fichier:
+
+        print("2 - Aucun fichier reçu")
 
         return jsonify({
             "success": False,
             "message": "Aucun fichier reçu"
         })
 
+    print(
+        "3 - Fichier reçu :",
+        fichier.filename
+    )
+
     temp = tempfile.NamedTemporaryFile(
         delete=False,
         suffix=".ged"
     )
 
-    fichier.save(temp.name)
-
-    gedcom_file = temp.name
-
-    gedcom_parser = Parser()
-    gedcom_parser.parse_file(
-        gedcom_file,
-        False
+    print(
+        "4 - Temp créé :",
+        temp.name
     )
-    construire_base_sqlite()
 
-    print("GEDCOM chargé")
+    try:
 
-    return jsonify({
-        "success": True
-    })
+        fichier.save(temp.name)
+
+        print("5 - Fichier sauvegardé")
+
+        gedcom_file = temp.name
+
+        print("6 - Début parsing")
+
+        gedcom_parser = Parser()
+
+        gedcom_parser.parse_file(
+            gedcom_file,
+            False
+        )
+
+        print("7 - Parsing terminé")
+
+        print("8 - Construction SQLite")
+
+        construire_base_sqlite()
+
+        print("9 - SQLite terminée")
+
+        print("10 - GEDCOM chargé")
+
+        return jsonify({
+            "success": True
+        })
+
+    except Exception as e:
+
+        print(
+            "ERREUR :",
+            str(e)
+        )
+
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        })
 
 
 # ------------------------------------------------------------------
