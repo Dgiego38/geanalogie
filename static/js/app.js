@@ -1,26 +1,38 @@
-async function rechercherPersonnes(inputId, boxId) {
-    let query = document.getElementById(inputId).value;
-    if (query.length < 2) return;
+// Récupération du sessionId depuis l'URL
+const urlParams = new URLSearchParams(window.location.search);
+const sessionId = urlParams.get('sessionId');
 
-    // Utilisation de la variable sessionId globale définie dans chemin.html
-    let response = await fetch(`/api/personnes?sessionId=${sessionId}&q=${encodeURIComponent(query)}`);
-    let data = await response.json();
+// Fonction générique pour gérer les suggestions
+async function setupAutocomplete(inputId, suggestionId) {
+    const input = document.getElementById(inputId);
+    const suggestionBox = document.getElementById(suggestionId);
 
-    let box = document.getElementById(boxId);
-    box.innerHTML = "";
-    data.forEach(name => {
-        let div = document.createElement("div");
-        div.className = "suggestion";
-        div.innerText = name;
-        div.onclick = () => {
-            document.getElementById(inputId).value = name;
-            box.innerHTML = "";
-        };
-        box.appendChild(div);
+    input.addEventListener('input', async (e) => {
+        const query = e.target.value;
+        if (query.length < 2) {
+            suggestionBox.innerHTML = "";
+            return;
+        }
+
+        // Appel API vers app.py
+        const response = await fetch(`/api/personnes?q=${encodeURIComponent(query)}&sessionId=${sessionId}`);
+        const data = await response.json();
+
+        // Affichage des suggestions
+        suggestionBox.innerHTML = "";
+        data.forEach(name => {
+            const div = document.createElement("div");
+            div.className = "suggestion";
+            div.innerText = name;
+            div.onclick = () => {
+                input.value = name;
+                suggestionBox.innerHTML = "";
+            };
+            suggestionBox.appendChild(div);
+        });
     });
 }
 
-document.addEventListener("input", function(e) {
-    if (e.target.id === "p1") rechercherPersonnes("p1", "suggestions1");
-    if (e.target.id === "p2") rechercherPersonnes("p2", "suggestions2");
-});
+// Initialisation pour les deux champs
+setupAutocomplete('p1', 'suggestions1');
+setupAutocomplete('p2', 'suggestions2');

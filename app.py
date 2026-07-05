@@ -1,13 +1,20 @@
 from flask import Flask, render_template, request, jsonify
 from gedcom.parser import Parser
 from gedcom.element.individual import IndividualElement
+from pymongo import MongoClient # <--- AJOUTE ÇA
+from dotenv import load_dotenv  # <--- AJOUTE ÇA
 import tempfile
 import os
 
 app = Flask(__name__)
+load_dotenv() # <--- AJOUTE ÇA
+
+client = MongoClient(os.getenv("MONGODB_URI"))
+db = client.genealogie
 
 # Variable globale pour stocker le parser en mémoire
 gedcom_parser = None
+
 
 @app.route("/")
 def upload_page():
