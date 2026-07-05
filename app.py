@@ -1,27 +1,33 @@
 from flask import Flask, render_template, request, jsonify
-from pymongo import MongoClient
-from datetime import datetime, timedelta
-from dotenv import load_dotenv
+from gedcom.parser import Parser
+from gedcom.element.individual import IndividualElement
+import tempfile
 import os
-import gzip
-import json
 
 app = Flask(__name__)
-load_dotenv()
 
-# Connexion MongoDB
-client = MongoClient(os.getenv("MONGODB_URI"))
-db = client.genealogie
-
-# Index pour TTL et recherche rapide sur les nouvelles collections
-db.individuals.create_index("expireAt", expireAfterSeconds=0)
-db.individuals.create_index("sessionId")
-db.families.create_index("expireAt", expireAfterSeconds=0)
-db.families.create_index("sessionId")
+# Variable globale pour stocker le parser en mémoire
+gedcom_parser = None
 
 @app.route("/")
 def upload_page():
     return render_template("upload.html")
+
+@app.route("/upload_ged", methods=["POST"])
+def upload_ged():
+    global gedcom_parser
+    fichier = request.files.get("file")
+    if not fichier:
+        return jsonify({"success": False, "message": "Aucun fichier reçu"})
+
+    temp = tempfile.NamedTemporaryFile(delete=False, suffix=".ged")
+    fichier.save(temp.name)
+    
+    # Parsing immédiat
+    gedcom_parser = Parser()
+    gedcom_parser.parse_file(temp.name, False)
+    
+    return jsonify({"success": True})
 
 @app.route("/menu")
 def accueil():
@@ -31,68 +37,39 @@ def accueil():
 def chemin():
     return render_template("chemin.html")
 
-@app.route("/api/save_data", methods=["POST"])
-def save_data():
-    compressed_data = request.data
-    decompressed_data = gzip.decompress(compressed_data)
-    data = json.loads(decompressed_data.decode('utf-8'))
+@app.route("/chemin_result")
+def chemin_result():
+    if not gedcom_parser: return jsonify([])
     
-    session_id = data.get("sessionId")
-    individuals = data.get("individuals", [])
-    families = data.get("families", [])
+    person1 = request.args.get("person1")
+    person2 = request.args.get("person2")
     
-    # Nettoyage ancienne session
-    db.individuals.delete_many({"sessionId": session_id})
-    db.families.delete_many({"sessionId": session_id})
-    
-    expire_at = datetime.utcnow() + timedelta(hours=1)
-    
-    # Stockage
-    if individuals:
-        for ind in individuals:
-            ind.update({"sessionId": session_id, "expireAt": expire_at})
-        db.individuals.insert_many(individuals)
-        
-    if families:
-        for fam in families:
-            fam.update({"sessionId": session_id, "expireAt": expire_at})
-        db.families.insert_many(families)
-        
-    return jsonify({"success": True})
+    # Recherche des objets personnes par nom
+    p1, p2 = None, None
+    for indiv in gedcom_parser.get_root_child_elements():
+        if isinstance(indiv, IndividualElement):
+            full = f"{indiv.get_name()[0]} {indiv.get_name()[1]}"
+            if full == person1: p1 = indiv
+            if full == person2: p2 = indiv
+            
+    if p1 and p2:
+        # La magie de la bibliothèque gedcom
+        nodes = gedcom_parser.display_relationship_path(p1, p2)
+        # On formate le retour pour ton JS
+        return jsonify([{"name": f"{n.get_name()[0]} {n.get_name()[1]}", "level": i} for i, n in enumerate(nodes)])
+    return jsonify([])
 
 @app.route("/api/personnes")
 def api_personnes():
-    # Recherche corrigée : pointe vers db.individuals et utilise le champ "name"
-    session_id = request.args.get("sessionId")
-    q = request.args.get("q", "")
-    
-    cursor = db.individuals.find({
-        "sessionId": session_id, 
-        "name": {"$regex": "^" + q, "$options": "i"}
-    }).limit(10)
-    
-    return jsonify([doc["name"] for doc in cursor])
-
-@app.route("/chemin_result")
-def chemin_result():
-    # Récupération des paramètres
-    session_id = request.args.get("sessionId")
-    p1 = request.args.get("person1")
-    p2 = request.args.get("person2")
-    
-    # Structure retournée (format JSON pour tree.js)
-    data = {
-        "name": p1,
-        "dates": "1900-1970",
-        "children": [
-            {
-                "name": p2,
-                "dates": "1930-2000",
-                "children": []
-            }
-        ]
-    }
-    return jsonify(data)
+    if not gedcom_parser: return jsonify([])
+    q = request.args.get("q", "").lower()
+    personnes = []
+    for indiv in gedcom_parser.get_root_child_elements():
+        if isinstance(indiv, IndividualElement):
+            full = f"{indiv.get_name()[0]} {indiv.get_name()[1]}"
+            if q in full.lower():
+                personnes.append(full)
+    return jsonify(personnes[:10])
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(debug=True)
