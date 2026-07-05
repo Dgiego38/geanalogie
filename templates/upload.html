@@ -1,32 +1,100 @@
-<input type="file" id="gedFile" accept=".ged">
-<button id="btnImport">Continuer</button>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Charger un GEDCOM</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #f5f5f7; }
+        .container { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 400px; text-align: center; }
+        #progress-container { width: 100%; background: #eee; height: 10px; border-radius: 5px; margin: 20px 0; display: none; overflow: hidden; }
+        #progress-bar { width: 0%; height: 100%; background: #007aff; transition: width 0.3s ease; }
+        #status-text { font-size: 14px; color: #555; margin-bottom: 10px; }
+        .help-link { font-size: 12px; color: #007aff; text-decoration: none; display: block; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🧬 Import GEDCOM</h1>
+    <input type="file" id="gedFile" accept=".ged">
+    <a href="#" class="help-link">Où trouver son fichier GEDCOM ?</a>
+    
+    <div id="progress-container">
+        <div id="progress-bar"></div>
+    </div>
+    <div id="status-text"></div>
+    
+    <button id="btnImport" style="margin-top: 20px;">Continuer</button>
+</div>
+
 <script>
-document.getElementById("btnImport").addEventListener("click", async () => {
-    const file = document.getElementById("gedFile").files[0];
-    const sessionId = crypto.randomUUID();
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-        const lines = e.target.result.split(/\r?\n/);
-        const individuals = [], families = [];
-        let currentObj = null;
-        lines.forEach(line => {
-            const parts = line.split(" ");
-            const level = parts[0], tag = parts[1], val = parts.slice(2).join(" ");
-            if (level === "0" && val === "INDI") currentObj = { id: tag, type: "INDI", name: "Inconnu" };
-            else if (level === "0" && val === "FAM") currentObj = { id: tag, type: "FAM", chil: [] };
-            else if (currentObj) {
-                if (level === "1" && tag === "NAME") currentObj.name = val.replace(/\//g, "");
-                if (currentObj.type === "FAM") {
-                    if (["HUSB", "WIFE"].includes(tag)) currentObj[tag.toLowerCase()] = parts[2];
-                    if (tag === "CHIL") currentObj.chil.push(parts[2]);
+    const btn = document.getElementById("btnImport");
+    const bar = document.getElementById("progress-bar");
+    const container = document.getElementById("progress-container");
+    const status = document.getElementById("status-text");
+
+    function updateProgress(percent, message) {
+        bar.style.width = percent + "%";
+        status.innerText = message;
+    }
+
+    btn.addEventListener("click", async () => {
+        const file = document.getElementById("gedFile").files[0];
+        if (!file) return alert("Veuillez sélectionner un fichier GEDCOM.");
+
+        // UI Initialisation
+        container.style.display = "block";
+        btn.disabled = true;
+        updateProgress(10, "Lecture du fichier...");
+
+        const sessionId = crypto.randomUUID();
+        const reader = new FileReader();
+
+        reader.onload = async (e) => {
+            updateProgress(30, "Analyse des données (parsing)...");
+            
+            const lines = e.target.result.split(/\r?\n/);
+            const individuals = [], families = [];
+            let currentObj = null;
+
+            // Parsing logique
+            lines.forEach((line, index) => {
+                const parts = line.split(" ");
+                const level = parts[0], tag = parts[1], val = parts.slice(2).join(" ");
+                
+                if (level === "0" && val === "INDI") currentObj = { id: tag, type: "INDI", name: "Inconnu" };
+                else if (level === "0" && val === "FAM") currentObj = { id: tag, type: "FAM", chil: [] };
+                else if (currentObj) {
+                    if (level === "1" && tag === "NAME") currentObj.name = val.replace(/\//g, "");
+                    if (currentObj.type === "FAM") {
+                        if (["HUSB", "WIFE"].includes(tag)) currentObj[tag.toLowerCase()] = parts[2];
+                        if (tag === "CHIL") currentObj.chil.push(parts[2]);
+                    }
                 }
+                if (level === "0" && currentObj) (currentObj.type === "INDI" ? individuals : families).push(currentObj);
+            });
+
+            updateProgress(60, "Compression des données...");
+            const blob = new Blob([JSON.stringify({sessionId, individuals, families})]);
+            const compressedStream = blob.stream().pipeThrough(new CompressionStream("gzip"));
+            
+            updateProgress(80, "Envoi au serveur, presque fini !");
+            const response = await fetch("/api/save_data", { 
+                method: "POST", 
+                body: await new Response(compressedStream).blob() 
+            });
+
+            if (response.ok) {
+                updateProgress(100, "Terminé ! Redirection...");
+                window.location.href = "/menu?sessionId=" + sessionId;
+            } else {
+                status.innerText = "Erreur lors de l'envoi.";
+                btn.disabled = false;
             }
-            if (level === "0" && currentObj) (currentObj.type === "INDI" ? individuals : families).push(currentObj);
-        });
-        const blob = new Blob([JSON.stringify({sessionId, individuals, families})]);
-        await fetch("/api/save_data", { method: "POST", body: await new Response(blob.stream().pipeThrough(new CompressionStream("gzip"))).blob() });
-        window.location.href = "/menu?sessionId=" + sessionId;
-    };
-    reader.readAsText(file);
-});
+        };
+        reader.readAsText(file);
+    });
 </script>
+
+</body>
+</html>
