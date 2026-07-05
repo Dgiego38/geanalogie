@@ -59,9 +59,53 @@ def api_personnes():
 # --- Logique de recherche de chemin ---
 @app.route("/chemin_result")
 def chemin_result():
-    # Ici, implémentation simplifiée du chemin entre 2 personnes
-    # Note: Dans un vrai système, tu aurais besoin d'une recherche BFS dans ta base MongoDB
-    return jsonify([{"name": request.args.get("person1"), "level": 0}, {"name": request.args.get("person2"), "level": 1}])
+    session_id = request.args.get("sessionId")
+    name1 = request.args.get("person1")
+    name2 = request.args.get("person2")
+
+    # 1. Trouver les IDs des deux personnes
+    p1 = db.individuals.find_one({"sessionId": session_id, "name": name1})
+    p2 = db.individuals.find_one({"sessionId": session_id, "name": name2})
+    
+    if not p1 or not p2: return jsonify([])
+
+    start_id = p1['id']
+    end_id = p2['id']
+
+    # 2. Algorithme BFS pour trouver le chemin
+    queue = [[start_id]]
+    visited = {start_id}
+
+    while queue:
+        path = queue.pop(0)
+        current_id = path[-1]
+
+        if current_id == end_id:
+            # Conversion des IDs en noms pour le frontend
+            result = []
+            for i, p_id in enumerate(path):
+                indiv = db.individuals.find_one({"sessionId": session_id, "id": p_id})
+                result.append({"name": indiv['name'], "level": i})
+            return jsonify(result)
+
+        # Trouver les familles de la personne courante
+        families = db.families.find({"sessionId": session_id, "$or": [{"husb": current_id}, {"wife": current_id}, {"chil": current_id}]})
+        
+        for fam in families:
+            # Extraire tous les membres liés à cette famille
+            neighbors = []
+            if fam.get('husb'): neighbors.append(fam['husb'])
+            if fam.get('wife'): neighbors.append(fam['wife'])
+            if fam.get('chil'): neighbors.extend(fam['chil'])
+            
+            for neighbor in neighbors:
+                if neighbor not in visited and neighbor != current_id:
+                    visited.add(neighbor)
+                    new_path = list(path)
+                    new_path.append(neighbor)
+                    queue.append(new_path)
+
+    return jsonify([]) # Aucun chemin trouvé
 
 if __name__ == "__main__":
     app.run(debug=True)
