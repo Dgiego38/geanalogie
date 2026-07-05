@@ -32,29 +32,31 @@ def chemin():
 
 @app.route("/api/save_data", methods=["POST"])
 def save_data():
-    # Décompression des données
     compressed_data = request.data
     decompressed_data = gzip.decompress(compressed_data)
     data = json.loads(decompressed_data.decode('utf-8'))
     
     session_id = data.get("sessionId")
     individuals = data.get("individuals", [])
-    is_first_batch = data.get("isFirstBatch", False)
+    families = data.get("families", [])
     
-    # Nettoyage : suppression des anciennes données uniquement pour cette session
-    if is_first_batch and session_id:
-        persons_collection.delete_many({"sessionId": session_id})
+    # Nettoyage ancienne session
+    db.individuals.delete_many({"sessionId": session_id})
+    db.families.delete_many({"sessionId": session_id})
     
     expire_at = datetime.utcnow() + timedelta(hours=1)
     
-    # Insertion des documents avec l'étiquette sessionId
-    documents = [
-        {"fullname": ind.get('name', 'Inconnu'), "sessionId": session_id, "expireAt": expire_at} 
-        for ind in individuals
-    ]
-    
-    if documents:
-        persons_collection.insert_many(documents)
+    # Stockage
+    if individuals:
+        for ind in individuals:
+            ind.update({"sessionId": session_id, "expireAt": expire_at})
+        db.individuals.insert_many(individuals)
+        
+    if families:
+        for fam in families:
+            fam.update({"sessionId": session_id, "expireAt": expire_at})
+        db.families.insert_many(families)
+        
     return jsonify({"success": True})
 
 @app.route("/api/personnes")
