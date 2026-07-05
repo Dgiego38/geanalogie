@@ -28,11 +28,11 @@
                 const families = [];
                 let currentObj = null;
 
-                // Parsing structuré
+                // Parsing structuré corrigé
                 lines.forEach(line => {
                     const parts = line.split(" ");
-                    const level = parts[0];
-                    const tag = parts[1];
+                    const level = parts[0]; // Niveau (0, 1, 2)
+                    const tag = parts[1];   // Tag (INDI, FAM, NAME, etc.)
                     const val = parts.slice(2).join(" ");
 
                     if (level === "0" && val === "INDI") {
@@ -42,11 +42,15 @@
                         currentObj = { id: tag, type: "FAM", husb: null, wife: null, chil: [] };
                         families.push(currentObj);
                     } else if (currentObj) {
-                        if (tag === "1" && parts[1] === "NAME") currentObj.name = parts.slice(2).join(" ").replace(/\//g, "");
+                        // Correction : on vérifie bien le level '1' ET le tag
+                        if (level === "1" && tag === "NAME") {
+                             currentObj.name = parts.slice(2).join(" ").replace(/\//g, "");
+                        }
+                        
                         if (currentObj.type === "FAM") {
-                            if (tag === "1" && parts[1] === "HUSB") currentObj.husb = parts[2];
-                            if (tag === "1" && parts[1] === "WIFE") currentObj.wife = parts[2];
-                            if (tag === "1" && parts[1] === "CHIL") currentObj.chil.push(parts[2]);
+                            if (level === "1" && tag === "HUSB") currentObj.husb = parts[2];
+                            if (level === "1" && tag === "WIFE") currentObj.wife = parts[2];
+                            if (level === "1" && tag === "CHIL") currentObj.chil.push(parts[2]);
                         }
                     }
                 });
@@ -56,11 +60,18 @@
                 const blob = new Blob([JSON.stringify(payload)]);
                 const compressedStream = blob.stream().pipeThrough(new CompressionStream("gzip"));
                 
-                await fetch("/api/save_data", {
+                // Fetch avec vérification d'erreur
+                const response = await fetch("/api/save_data", {
                     method: "POST",
                     headers: { "Content-Type": "application/json", "Content-Encoding": "gzip" },
                     body: await new Response(compressedStream).blob()
                 });
+
+                if (!response.ok) {
+                    const errorMsg = await response.text();
+                    alert("Erreur lors de l'enregistrement : " + errorMsg);
+                    return;
+                }
 
                 window.location.href = "/menu?sessionId=" + sessionId;
             };
