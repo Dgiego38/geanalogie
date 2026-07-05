@@ -1,56 +1,73 @@
 from flask import Flask, render_template, request, jsonify
-from gedcom.parser import Parser
-from gedcom.element.individual import IndividualElement
-from pymongo import MongoClient # <--- AJOUTE ÇA
-from dotenv import load_dotenv  # <--- AJOUTE ÇA
-import tempfile
+from pymongo import MongoClient
+from dotenv import load_dotenv
 import os
+import gzip
+import json
 
 app = Flask(__name__)
-load_dotenv() # <--- AJOUTE ÇA
+load_dotenv()
 
+# Connexion MongoDB
 client = MongoClient(os.getenv("MONGODB_URI"))
 db = client.genealogie
 
-# Variable globale pour stocker le parser en mémoire
-gedcom_parser = None
+# ------------------------------------------------------------------
+# Route de réception des données parsées (Le chaînon manquant)
+# ------------------------------------------------------------------
+@app.route("/api/save_data", methods=["POST"])
+def save_data():
+    # 1. Récupération du flux compressé envoyé par upload_2.html
+    compressed_data = request.data
+    
+    # 2. Décompression
+    decompressed_data = gzip.decompress(compressed_data)
+    data = json.loads(decompressed_data.decode('utf-8'))
+    
+    session_id = data.get("sessionId")
+    individuals = data.get("individuals", [])
+    families = data.get("families", [])
+    
+    # 3. Nettoyage de l'ancienne session (si c'est le premier lot)
+    if data.get("isFirstBatch"):
+        db.individuals.delete_many({"sessionId": session_id})
+        db.families.delete_many({"sessionId": session_id})
+    
+    # 4. Insertion dans MongoDB
+    if individuals:
+        for ind in individuals:
+            ind.update({"sessionId": session_id})
+        db.individuals.insert_many(individuals)
+        
+    if families:
+        for fam in families:
+            fam.update({"sessionId": session_id})
+        db.families.insert_many(families)
+        
+    return jsonify({"success": True})
 
+# ------------------------------------------------------------------
+# Route de recherche (pour que ton app.js fonctionne)
+# ------------------------------------------------------------------
+@app.route("/api/personnes")
+def api_personnes():
+    session_id = request.args.get("sessionId")
+    q = request.args.get("q", "").lower()
+    
+    # Recherche dans la base de données
+    cursor = db.individuals.find({
+        "sessionId": session_id,
+        "name": {"$regex": q, "$options": "i"} 
+    }).limit(10)
+    
+    return jsonify([doc["name"] for doc in cursor])
 
+# ------------------------------------------------------------------
+# Routes de navigation
+# ------------------------------------------------------------------
 @app.route("/")
 def upload_page():
     return render_template("upload.html")
-
-@app.route("/upload_ged", methods=["POST"])
-def upload_ged():
-    global gedcom_parser
-    fichier = request.files.get("file")
-    if not fichier:
-        return jsonify({"success": False, "message": "Aucun fichier reçu"})
-
-    temp = tempfile.NamedTemporaryFile(delete=False, suffix=".ged")
-    fichier.save(temp.name)
-    
-    # 1. On parse avec la bibliothèque pour avoir la logique
-    gedcom_parser = Parser()
-    gedcom_parser.parse_file(temp.name, False)
-    
-    # 2. On extrait et on sauve dans MongoDB
-    session_id = str(os.urandom(16).hex()) # ID de session unique
-    individuals_data = []
-    
-    for indiv in gedcom_parser.get_root_child_elements():
-        if isinstance(indiv, IndividualElement):
-            prenom, nom = indiv.get_name()
-            individuals_data.append({
-                "sessionId": session_id,
-                "name": f"{prenom} {nom}",
-                "raw_id": indiv.get_pointer() # Important pour l'algo de chemin
-            })
-    
-    if individuals_data:
-        db.individuals.insert_many(individuals_data)
-    
-    return jsonify({"success": True, "sessionId": session_id})
 
 @app.route("/menu")
 def accueil():
@@ -59,41 +76,6 @@ def accueil():
 @app.route("/chemin")
 def chemin():
     return render_template("chemin.html")
-
-@app.route("/chemin_result")
-def chemin_result():
-    if not gedcom_parser: return jsonify([])
-    
-    person1 = request.args.get("person1")
-    person2 = request.args.get("person2")
-    
-    # Recherche des objets personnes par nom
-    p1, p2 = None, None
-    for indiv in gedcom_parser.get_root_child_elements():
-        if isinstance(indiv, IndividualElement):
-            full = f"{indiv.get_name()[0]} {indiv.get_name()[1]}"
-            if full == person1: p1 = indiv
-            if full == person2: p2 = indiv
-            
-    if p1 and p2:
-        # La magie de la bibliothèque gedcom
-        nodes = gedcom_parser.display_relationship_path(p1, p2)
-        # On formate le retour pour ton JS
-        return jsonify([{"name": f"{n.get_name()[0]} {n.get_name()[1]}", "level": i} for i, n in enumerate(nodes)])
-    return jsonify([])
-
-@app.route("/api/personnes")
-def api_personnes():
-    session_id = request.args.get("sessionId")
-    q = request.args.get("q", "").lower()
-    
-    # Recherche dans la base de données (plus rapide que le parser)
-    cursor = db.individuals.find({
-        "sessionId": session_id,
-        "name": {"$regex": q, "$options": "i"} 
-    }).limit(10)
-    
-    return jsonify([doc["name"] for doc in cursor])
 
 if __name__ == "__main__":
     app.run(debug=True)
