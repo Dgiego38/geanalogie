@@ -9,13 +9,14 @@ import json
 app = Flask(__name__)
 load_dotenv()
 
+# Connexion MongoDB
 client = MongoClient(os.getenv("MONGODB_URI"))
 db = client.genealogie
 persons_collection = db.persons
 
 # Index pour TTL et recherche rapide
 persons_collection.create_index("expireAt", expireAfterSeconds=0)
-persons_collection.create_index("sessionId") # Indispensable pour l'isolation
+persons_collection.create_index("sessionId") # Crucial pour l'isolation et la performance
 
 @app.route("/")
 def upload_page():
@@ -31,6 +32,7 @@ def chemin():
 
 @app.route("/api/save_data", methods=["POST"])
 def save_data():
+    # Décompression des données
     compressed_data = request.data
     decompressed_data = gzip.decompress(compressed_data)
     data = json.loads(decompressed_data.decode('utf-8'))
@@ -39,13 +41,13 @@ def save_data():
     individuals = data.get("individuals", [])
     is_first_batch = data.get("isFirstBatch", False)
     
-    # Nettoyage spécifique à ce sessionId uniquement
+    # Nettoyage : suppression des anciennes données uniquement pour cette session
     if is_first_batch and session_id:
         persons_collection.delete_many({"sessionId": session_id})
     
     expire_at = datetime.utcnow() + timedelta(hours=1)
     
-    # Ajout du champ sessionId à chaque document
+    # Insertion des documents avec l'étiquette sessionId
     documents = [
         {"fullname": ind.get('name', 'Inconnu'), "sessionId": session_id, "expireAt": expire_at} 
         for ind in individuals
@@ -57,10 +59,11 @@ def save_data():
 
 @app.route("/api/personnes")
 def api_personnes():
+    # Récupération du sessionId depuis l'URL (ex: /api/personnes?sessionId=xyz&q=jean)
     session_id = request.args.get("sessionId")
     q = request.args.get("q", "")
     
-    # Recherche filtrée par sessionId
+    # Recherche filtrée par sessionId pour ne renvoyer que les données de l'utilisateur[cite: 6]
     cursor = persons_collection.find({
         "sessionId": session_id, 
         "fullname": {"$regex": q, "$options": "i"}
