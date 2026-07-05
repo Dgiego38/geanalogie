@@ -58,10 +58,13 @@ def save_data():
 def api_personnes():
     session_id = request.args.get("sessionId")
     q = request.args.get("q", "")
+    
+    # Le "^" force la recherche à ne correspondre qu'au début du nom
     cursor = persons_collection.find({
         "sessionId": session_id, 
-        "fullname": {"$regex": q, "$options": "i"}
+        "fullname": {"$regex": "^" + q, "$options": "i"}
     }).limit(10)
+    
     return jsonify([doc["fullname"] for doc in cursor])
 
 @app.route("/chemin_result")
