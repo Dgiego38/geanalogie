@@ -12,11 +12,12 @@ load_dotenv()
 # Connexion MongoDB
 client = MongoClient(os.getenv("MONGODB_URI"))
 db = client.genealogie
-persons_collection = db.persons
 
-# Index pour TTL et recherche rapide
-persons_collection.create_index("expireAt", expireAfterSeconds=0)
-persons_collection.create_index("sessionId") # Crucial pour l'isolation et la performance
+# Index pour TTL et recherche rapide sur les nouvelles collections
+db.individuals.create_index("expireAt", expireAfterSeconds=0)
+db.individuals.create_index("sessionId")
+db.families.create_index("expireAt", expireAfterSeconds=0)
+db.families.create_index("sessionId")
 
 @app.route("/")
 def upload_page():
@@ -61,17 +62,16 @@ def save_data():
 
 @app.route("/api/personnes")
 def api_personnes():
-    # Récupération du sessionId et recherche avec ancrage au début du nom
+    # Recherche corrigée : pointe vers db.individuals et utilise le champ "name"
     session_id = request.args.get("sessionId")
     q = request.args.get("q", "")
     
-    # Le "^" force la recherche à ne correspondre qu'au début du nom
-    cursor = persons_collection.find({
+    cursor = db.individuals.find({
         "sessionId": session_id, 
-        "fullname": {"$regex": "^" + q, "$options": "i"}
+        "name": {"$regex": "^" + q, "$options": "i"}
     }).limit(10)
     
-    return jsonify([doc["fullname"] for doc in cursor])
+    return jsonify([doc["name"] for doc in cursor])
 
 @app.route("/chemin_result")
 def chemin_result():
@@ -80,10 +80,7 @@ def chemin_result():
     p1 = request.args.get("person1")
     p2 = request.args.get("person2")
     
-    # NOTE : Ici vous devrez implémenter votre algorithme de recherche de chemin (BFS/DFS).
-    # Pour l'instant, je renvoie une structure d'arbre hiérarchique compatible 
-    # avec la nouvelle fonction renderTree de tree.js.
-    
+    # Structure retournée (format JSON pour tree.js)
     data = {
         "name": p1,
         "dates": "1900-1970",
