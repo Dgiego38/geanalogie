@@ -29,7 +29,7 @@
                     .filter(line => line.startsWith("1 NAME"))
                     .map(line => ({ name: line.substring(7).replace(/\//g, "").trim() }));
 
-                const batchSize = 5000;
+                const batchSize = 7000;
                 const tasks = [];
                 
                 for (let i = 0; i < individuals.length; i += batchSize) {
@@ -52,7 +52,7 @@
                     })();
                     
                     tasks.push(task);
-                    if (tasks.length >= 5) { await Promise.all(tasks); tasks.length = 0; }
+                    if (tasks.length >= 10) { await Promise.all(tasks); tasks.length = 0; }
                 }
                 await Promise.all(tasks);
                 
