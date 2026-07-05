@@ -7,52 +7,44 @@
 <body>
     <h1>🧬 Importer votre fichier GEDCOM</h1>
     <input type="file" id="gedFile" accept=".ged">
-    <button id="btnImport">Continuer</button>
+    <button onclick="importGed()">Continuer</button>
     <p id="status"></p>
+
     <script>
-        document.getElementById("btnImport").addEventListener("click", async () => {
+        async function importGed() {
             const fileInput = document.getElementById("gedFile");
             const file = fileInput.files[0];
-            if (!file) return alert("Choisissez un fichier GEDCOM");
-            const sessionId = crypto.randomUUID(); 
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const lines = e.target.result.split(/\r?\n/);
-                const individuals = [];
-                const families = [];
-                let currentObj = null;
-                lines.forEach(line => {
-                    const parts = line.split(" ");
-                    const level = parts[0];
-                    const tag = parts[1];
-                    const val = parts.slice(2).join(" ");
-                    if (level === "0" && val === "INDI") {
-                        currentObj = { id: tag, type: "INDI", name: "Inconnu", parents: [], children: [] };
-                        individuals.push(currentObj);
-                    } else if (level === "0" && val === "FAM") {
-                        currentObj = { id: tag, type: "FAM", husb: null, wife: null, chil: [] };
-                        families.push(currentObj);
-                    } else if (currentObj) {
-                        if (level === "1" && tag === "NAME") currentObj.name = parts.slice(2).join(" ").replace(/\//g, "");
-                        if (currentObj.type === "FAM") {
-                            if (level === "1" && tag === "HUSB") currentObj.husb = parts[2];
-                            if (level === "1" && tag === "WIFE") currentObj.wife = parts[2];
-                            if (level === "1" && tag === "CHIL") currentObj.chil.push(parts[2]);
-                        }
-                    }
-                });
-                const payload = { sessionId, individuals, families, isFirstBatch: true };
-                const blob = new Blob([JSON.stringify(payload)]);
-                const compressedStream = blob.stream().pipeThrough(new CompressionStream("gzip"));
-                const response = await fetch("/api/save_data", {
+            const status = document.getElementById("status");
+
+            if (!file) {
+                alert("Choisissez un fichier GEDCOM");
+                return;
+            }
+
+            status.innerText = "Chargement du fichier...";
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {
+                // Envoi vers la route définie dans app.py
+                const response = await fetch("/upload_ged", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json", "Content-Encoding": "gzip" },
-                    body: await new Response(compressedStream).blob()
+                    body: formData
                 });
-                if (response.ok) window.location.href = "/menu?sessionId=" + sessionId;
-            };
-            reader.readAsText(file);
-        });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    status.innerText = "GEDCOM chargé.";
+                    window.location.href = "/menu";
+                } else {
+                    alert(result.message || "Erreur lors du chargement");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Erreur de communication avec le serveur.");
+            }
+        }
     </script>
 </body>
 </html>
