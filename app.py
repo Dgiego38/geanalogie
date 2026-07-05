@@ -23,11 +23,27 @@ def upload_ged():
     temp = tempfile.NamedTemporaryFile(delete=False, suffix=".ged")
     fichier.save(temp.name)
     
-    # Parsing immédiat
+    # 1. On parse avec la bibliothèque pour avoir la logique
     gedcom_parser = Parser()
     gedcom_parser.parse_file(temp.name, False)
     
-    return jsonify({"success": True})
+    # 2. On extrait et on sauve dans MongoDB
+    session_id = str(os.urandom(16).hex()) # ID de session unique
+    individuals_data = []
+    
+    for indiv in gedcom_parser.get_root_child_elements():
+        if isinstance(indiv, IndividualElement):
+            prenom, nom = indiv.get_name()
+            individuals_data.append({
+                "sessionId": session_id,
+                "name": f"{prenom} {nom}",
+                "raw_id": indiv.get_pointer() # Important pour l'algo de chemin
+            })
+    
+    if individuals_data:
+        db.individuals.insert_many(individuals_data)
+    
+    return jsonify({"success": True, "sessionId": session_id})
 
 @app.route("/menu")
 def accueil():
@@ -61,15 +77,16 @@ def chemin_result():
 
 @app.route("/api/personnes")
 def api_personnes():
-    if not gedcom_parser: return jsonify([])
+    session_id = request.args.get("sessionId")
     q = request.args.get("q", "").lower()
-    personnes = []
-    for indiv in gedcom_parser.get_root_child_elements():
-        if isinstance(indiv, IndividualElement):
-            full = f"{indiv.get_name()[0]} {indiv.get_name()[1]}"
-            if q in full.lower():
-                personnes.append(full)
-    return jsonify(personnes[:10])
+    
+    # Recherche dans la base de données (plus rapide que le parser)
+    cursor = db.individuals.find({
+        "sessionId": session_id,
+        "name": {"$regex": q, "$options": "i"} 
+    }).limit(10)
+    
+    return jsonify([doc["name"] for doc in cursor])
 
 if __name__ == "__main__":
     app.run(debug=True)
