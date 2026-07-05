@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import os
 import gzip
 import json
+import re
 
 app = Flask(__name__)
 load_dotenv()
@@ -11,6 +12,10 @@ load_dotenv()
 # Connexion MongoDB
 client = MongoClient(os.getenv("MONGODB_URI"))
 db = client.genealogie
+
+# Fonction utilitaire pour nettoyer les IDs (enlève les '@' pour comparer)
+def normalize_id(val):
+    return val.replace('@', '') if isinstance(val, str) else val
 
 # --- Routes de navigation ---
 @app.route("/")
@@ -52,27 +57,28 @@ def save_data():
 @app.route("/api/personnes")
 def api_personnes():
     session_id = request.args.get("sessionId")
-    q = request.args.get("q", "").lower()
-    cursor = db.individuals.find({"sessionId": session_id, "name": {"$regex": q, "$options": "i"}}).limit(10)
+    q = request.args.get("q", "")
+    # Regex insensible à la casse
+    cursor = db.individuals.find({"sessionId": session_id, "name": {"$regex": re.escape(q), "$options": "i"}}).limit(10)
     return jsonify([doc["name"] for doc in cursor])
 
-# --- Logique de recherche de chemin ---
+# --- Logique de recherche de chemin (Générique) ---
 @app.route("/chemin_result")
 def chemin_result():
     session_id = request.args.get("sessionId")
     name1 = request.args.get("person1")
     name2 = request.args.get("person2")
 
-    # 1. Trouver les IDs des deux personnes
-    p1 = db.individuals.find_one({"sessionId": session_id, "name": name1})
-    p2 = db.individuals.find_one({"sessionId": session_id, "name": name2})
+    # Recherche insensible à la casse avec regex
+    p1 = db.individuals.find_one({"sessionId": session_id, "name": {"$regex": f"^{re.escape(name1)}$", "$options": "i"}})
+    p2 = db.individuals.find_one({"sessionId": session_id, "name": {"$regex": f"^{re.escape(name2)}$", "$options": "i"}})
     
     if not p1 or not p2: return jsonify([])
 
-    start_id = p1['id']
-    end_id = p2['id']
+    # Utilisation des IDs normalisés
+    start_id = normalize_id(p1['id'])
+    end_id = normalize_id(p2['id'])
 
-    # 2. Algorithme BFS pour trouver le chemin
     queue = [[start_id]]
     visited = {start_id}
 
@@ -81,31 +87,40 @@ def chemin_result():
         current_id = path[-1]
 
         if current_id == end_id:
-            # Conversion des IDs en noms pour le frontend
             result = []
             for i, p_id in enumerate(path):
-                indiv = db.individuals.find_one({"sessionId": session_id, "id": p_id})
-                result.append({"name": indiv['name'], "level": i})
+                # On cherche en tenant compte que l'ID en base peut avoir des '@'
+                indiv = db.individuals.find_one({
+                    "sessionId": session_id, 
+                    "$expr": {"$eq": [{"$replaceRoot": {"newRoot": "$$ROOT"}}, {"$replaceRoot": {"newRoot": "$$ROOT"}}]} # Astuce : chercher dynamiquement
+                })
+                # Plus simple : on boucle pour trouver celui qui matche le id normalisé
+                all_inds = db.individuals.find({"sessionId": session_id})
+                found = next((x for x in all_inds if normalize_id(x['id']) == p_id), None)
+                if found:
+                    result.append({"name": found['name'], "level": i})
             return jsonify(result)
 
-        # Trouver les familles de la personne courante
-        families = db.families.find({"sessionId": session_id, "$or": [{"husb": current_id}, {"wife": current_id}, {"chil": current_id}]})
-        
-        for fam in families:
-            # Extraire tous les membres liés à cette famille
-            neighbors = []
-            if fam.get('husb'): neighbors.append(fam['husb'])
-            if fam.get('wife'): neighbors.append(fam['wife'])
-            if fam.get('chil'): neighbors.extend(fam['chil'])
+        # Chercher les familles où la personne est présente (husb, wife, chil)
+        # On doit récupérer toutes les familles et filtrer en Python pour gérer la normalisation des IDs
+        all_fams = db.families.find({"sessionId": session_id})
+        for fam in all_fams:
+            # Normalisation des membres de la famille
+            husb = normalize_id(fam.get('husb', ''))
+            wife = normalize_id(fam.get('wife', ''))
+            children = [normalize_id(c) for c in fam.get('chil', [])]
             
-            for neighbor in neighbors:
-                if neighbor not in visited and neighbor != current_id:
-                    visited.add(neighbor)
-                    new_path = list(path)
-                    new_path.append(neighbor)
-                    queue.append(new_path)
+            # Si current_id est dans cette famille, on ajoute les autres membres comme voisins
+            if current_id in [husb, wife] or current_id in children:
+                neighbors = [n for n in [husb, wife] + children if n and n != current_id]
+                for neighbor in neighbors:
+                    if neighbor not in visited:
+                        visited.add(neighbor)
+                        new_path = list(path)
+                        new_path.append(neighbor)
+                        queue.append(new_path)
 
-    return jsonify([]) # Aucun chemin trouvé
+    return jsonify([])
 
 if __name__ == "__main__":
     app.run(debug=True)
