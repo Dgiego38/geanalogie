@@ -3,41 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <title>Charger un GEDCOM</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-
     <h1>🧬 Importer votre fichier GEDCOM</h1>
     <input type="file" id="gedFile" accept=".ged">
     <button id="btnImport">Continuer</button>
     <p id="status"></p>
 
-<script>
-    // ... (code précédent inchangé jusqu'au batch)
-    for (let i = 0; i < individuals.length; i += batchSize) {
-        const batch = individuals.slice(i, i + batchSize);
-        
-        const task = (async () => {
-            const blob = new Blob([JSON.stringify({ 
-                // SessionId retiré
-                individuals: batch,
-                isFirstBatch: (i === 0) 
-            })]);
-            // ... (reste du fetch et compression identique)
-            const compressedStream = blob.stream().pipeThrough(new CompressionStream("gzip"));
-            const compressedBlob = await new Response(compressedStream).blob();
+    <script>
+        document.getElementById("btnImport").addEventListener("click", async () => {
+            const fileInput = document.getElementById("gedFile");
+            const file = fileInput.files[0];
+            const status = document.getElementById("status");
 
-            const response = await fetch("/api/save_data", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Content-Encoding": "gzip" },
-                body: compressedBlob
-            });
-            // ...
-        })();
-        // ...
-    }
-    // Redirection simple sans paramètre
-    window.location.href = "/menu"; 
-</script>
+            if (!file) return alert("Choisissez un fichier GEDCOM");
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                status.innerText = "Parsing local...";
+                const lines = e.target.result.split(/\r?\n/);
+                const individuals = lines
+                    .filter(line => line.startsWith("1 NAME"))
+                    .map(line => ({ name: line.substring(7).replace(/\//g, "").trim() }));
+
+                const batchSize = 5000;
+                const tasks = [];
+                
+                for (let i = 0; i < individuals.length; i += batchSize) {
+                    const batch = individuals.slice(i, i + batchSize);
+                    
+                    const task = (async () => {
+                        const blob = new Blob([JSON.stringify({ individuals: batch, isFirstBatch: (i === 0) })]);
+                        const compressedStream = blob.stream().pipeThrough(new CompressionStream("gzip"));
+                        const response = await fetch("/api/save_data", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json", "Content-Encoding": "gzip" },
+                            body: await new Response(compressedStream).blob()
+                        });
+                        if (!response.ok) throw new Error("Erreur lot " + i);
+                    })();
+                    
+                    tasks.push(task);
+                    if (tasks.length >= 5) { await Promise.all(tasks); tasks.length = 0; }
+                }
+                await Promise.all(tasks);
+                window.location.href = "/menu";
+            };
+            reader.readAsText(file);
+        });
+    </script>
 </body>
 </html>
