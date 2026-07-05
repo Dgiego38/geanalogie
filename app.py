@@ -24,6 +24,10 @@ def upload_page():
 def accueil():
     return render_template("index.html")
 
+@app.route("/chemin")
+def chemin():
+    return render_template("chemin.html")
+
 @app.route("/api/save_data", methods=["POST"])
 def save_data():
     compressed_data = request.data
