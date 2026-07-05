@@ -48,27 +48,33 @@ def api_personnes():
 @app.route("/chemin_result")
 def chemin_result():
     session_id = request.args.get("sessionId")
-    p1 = db.individuals.find_one({"sessionId": session_id, "name": request.args.get("person1")})
-    p2 = db.individuals.find_one({"sessionId": session_id, "name": request.args.get("person2")})
+    p1_name = request.args.get("person1")
+    p2_name = request.args.get("person2")
+
+    # 1. On récupère juste les IDs (Léger en RAM)
+    p1 = db.individuals.find_one({"sessionId": session_id, "name": p1_name}, {"id": 1})
+    p2 = db.individuals.find_one({"sessionId": session_id, "name": p2_name}, {"id": 1})
     if not p1 or not p2: return jsonify([])
+
+    # 2. On utilise l'Aggregation Pipeline pour que MongoDB fasse le "BFS"
+    # Cela évite de charger des milliers de documents en RAM
+    pipeline = [
+        {"$match": {"id": p1['id'], "sessionId": session_id}},
+        {"$graphLookup": {
+            "from": "families",
+            "startWith": "$id",
+            "connectFromField": "id",
+            "connectToField": "chil", # ou husb/wife selon la structure
+            "as": "path",
+            "maxDepth": 10,
+            "depthField": "numLinks"
+        }}
+    ]
     
-    # Algorithme BFS simplifié
-    queue = [[p1['id']]]
-    visited = {p1['id']}
-    while queue:
-        path = queue.pop(0)
-        curr = path[-1]
-        if curr == p2['id']:
-            result = [{"name": db.individuals.find_one({"id": pid})['name'], "level": i} for i, pid in enumerate(path)]
-            return jsonify(result)
-        
-        fams = db.families.find({"sessionId": session_id, "$or": [{"husb": curr}, {"wife": curr}, {"chil": curr}]})
-        for f in fams:
-            neighbors = [x for x in [f.get('husb'), f.get('wife')] + f.get('chil', []) if x and x != curr]
-            for n in neighbors:
-                if n not in visited:
-                    visited.add(n)
-                    queue.append(path + [n])
-    return jsonify([])
+    # Exécution : Ton serveur Python ne fait que transmettre l'ordre
+    # MongoDB utilise ses index pour trouver le chemin.
+    result = list(db.individuals.aggregate(pipeline))
+    
+    return jsonify(result)
 
 if __name__ == "__main__": app.run(debug=True)
