@@ -13,8 +13,9 @@ client = MongoClient(os.getenv("MONGODB_URI"))
 db = client.genealogie
 persons_collection = db.persons
 
-# Index pour TTL et recherche
+# Index pour TTL et recherche rapide
 persons_collection.create_index("expireAt", expireAfterSeconds=0)
+persons_collection.create_index("sessionId") # Indispensable pour l'isolation
 
 @app.route("/")
 def upload_page():
@@ -34,15 +35,21 @@ def save_data():
     decompressed_data = gzip.decompress(compressed_data)
     data = json.loads(decompressed_data.decode('utf-8'))
     
+    session_id = data.get("sessionId")
     individuals = data.get("individuals", [])
     is_first_batch = data.get("isFirstBatch", False)
     
-    if is_first_batch:
-        persons_collection.delete_many({}) # Vide la collection pour un nouvel import
+    # Nettoyage spécifique à ce sessionId uniquement
+    if is_first_batch and session_id:
+        persons_collection.delete_many({"sessionId": session_id})
     
     expire_at = datetime.utcnow() + timedelta(hours=1)
     
-    documents = [{"fullname": ind.get('name', 'Inconnu'), "expireAt": expire_at} for ind in individuals]
+    # Ajout du champ sessionId à chaque document
+    documents = [
+        {"fullname": ind.get('name', 'Inconnu'), "sessionId": session_id, "expireAt": expire_at} 
+        for ind in individuals
+    ]
     
     if documents:
         persons_collection.insert_many(documents)
@@ -50,9 +57,15 @@ def save_data():
 
 @app.route("/api/personnes")
 def api_personnes():
-    # Recherche globale sans sessionId
+    session_id = request.args.get("sessionId")
     q = request.args.get("q", "")
-    cursor = persons_collection.find({"fullname": {"$regex": q, "$options": "i"}}).limit(10)
+    
+    # Recherche filtrée par sessionId
+    cursor = persons_collection.find({
+        "sessionId": session_id, 
+        "fullname": {"$regex": q, "$options": "i"}
+    }).limit(10)
+    
     return jsonify([doc["fullname"] for doc in cursor])
 
 if __name__ == "__main__":

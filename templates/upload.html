@@ -18,7 +18,10 @@
 
             if (!file) return alert("Choisissez un fichier GEDCOM");
 
+            // Génération de l'identifiant unique pour cette session d'import
+            const sessionId = crypto.randomUUID(); 
             const reader = new FileReader();
+
             reader.onload = async (e) => {
                 status.innerText = "Parsing local...";
                 const lines = e.target.result.split(/\r?\n/);
@@ -33,7 +36,12 @@
                     const batch = individuals.slice(i, i + batchSize);
                     
                     const task = (async () => {
-                        const blob = new Blob([JSON.stringify({ individuals: batch, isFirstBatch: (i === 0) })]);
+                        // Inclusion du sessionId dans chaque lot envoyé au serveur
+                        const blob = new Blob([JSON.stringify({ 
+                            sessionId: sessionId, 
+                            individuals: batch, 
+                            isFirstBatch: (i === 0) 
+                        })]);
                         const compressedStream = blob.stream().pipeThrough(new CompressionStream("gzip"));
                         const response = await fetch("/api/save_data", {
                             method: "POST",
@@ -47,7 +55,9 @@
                     if (tasks.length >= 5) { await Promise.all(tasks); tasks.length = 0; }
                 }
                 await Promise.all(tasks);
-                window.location.href = "/menu";
+                
+                // Redirection vers le menu en transmettant le sessionId
+                window.location.href = "/menu?sessionId=" + sessionId;
             };
             reader.readAsText(file);
         });
