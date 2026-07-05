@@ -25,7 +25,10 @@
                 const lines = e.target.result.split(/\r?\n/);
                 const individuals = lines
                     .filter(line => line.startsWith("1 NAME"))
-                    .map(line => ({ name: line.substring(7).replace(/\//g, "").trim() }));
+                    .map(line => ({ 
+                        // Correction : remplacement du slash par un espace et nettoyage des espaces doubles
+                        name: line.substring(7).replace(/\//g, " ").replace(/\s+/g, " ").trim() 
+                    }));
 
                 const batchSize = 8000;
                 const tasks = [];
