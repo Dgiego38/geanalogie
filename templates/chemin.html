@@ -1,26 +1,16 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Recherche chemin</title>
-</head>
-<body>
-    <script>
-        // On rend le sessionId global pour que app.js puisse le lire
-        window.sessionId = new URLSearchParams(window.location.search).get('sessionId');
-        if (!window.sessionId) window.location.href = "/";
-    </script>
-    <div class="contenu">
-        <h3>Personne 1</h3>
-        <input id="p1" placeholder="Tape un nom...">
-        <div id="suggestions1"></div>
-        <h3>Personne 2</h3>
-        <input id="p2" placeholder="Tape un nom...">
-        <div id="suggestions2"></div>
-        <button onclick="chercher()">Rechercher le lien</button>
-        <div id="tree"></div>
-    </div>
-    <script src="{{ url_for('static', filename='js/tree.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-</body>
-</html>
+<h3>Personne 1</h3> <input id="p1" placeholder="Tape un nom..."> <div id="suggestions1"></div>
+<h3>Personne 2</h3> <input id="p2" placeholder="Tape un nom..."> <div id="suggestions2"></div>
+<button onclick="chercher()">Rechercher le lien</button>
+<div id="tree"></div>
+
+<script>
+window.sessionId = new URLSearchParams(window.location.search).get('sessionId');
+async function chercher() {
+    let p1 = document.getElementById("p1").value;
+    let p2 = document.getElementById("p2").value;
+    let res = await fetch(`/chemin_result?sessionId=${window.sessionId}&person1=${p1}&person2=${p2}`);
+    let data = await res.json();
+    document.getElementById("tree").innerHTML = data.map(n => `<div>${n.name}</div>`).join("");
+}
+</script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
