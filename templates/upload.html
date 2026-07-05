@@ -9,32 +9,23 @@
     <input type="file" id="gedFile" accept=".ged">
     <button id="btnImport">Continuer</button>
     <p id="status"></p>
-
     <script>
         document.getElementById("btnImport").addEventListener("click", async () => {
             const fileInput = document.getElementById("gedFile");
             const file = fileInput.files[0];
-            const status = document.getElementById("status");
             if (!file) return alert("Choisissez un fichier GEDCOM");
-
             const sessionId = crypto.randomUUID(); 
             const reader = new FileReader();
-
             reader.onload = async (e) => {
-                status.innerText = "Parsing complet...";
                 const lines = e.target.result.split(/\r?\n/);
-                
                 const individuals = [];
                 const families = [];
                 let currentObj = null;
-
-                // Parsing structuré corrigé
                 lines.forEach(line => {
                     const parts = line.split(" ");
-                    const level = parts[0]; // Niveau (0, 1, 2)
-                    const tag = parts[1];   // Tag (INDI, FAM, NAME, etc.)
+                    const level = parts[0];
+                    const tag = parts[1];
                     const val = parts.slice(2).join(" ");
-
                     if (level === "0" && val === "INDI") {
                         currentObj = { id: tag, type: "INDI", name: "Inconnu", parents: [], children: [] };
                         individuals.push(currentObj);
@@ -42,11 +33,7 @@
                         currentObj = { id: tag, type: "FAM", husb: null, wife: null, chil: [] };
                         families.push(currentObj);
                     } else if (currentObj) {
-                        // Correction : on vérifie bien le level '1' ET le tag
-                        if (level === "1" && tag === "NAME") {
-                             currentObj.name = parts.slice(2).join(" ").replace(/\//g, "");
-                        }
-                        
+                        if (level === "1" && tag === "NAME") currentObj.name = parts.slice(2).join(" ").replace(/\//g, "");
                         if (currentObj.type === "FAM") {
                             if (level === "1" && tag === "HUSB") currentObj.husb = parts[2];
                             if (level === "1" && tag === "WIFE") currentObj.wife = parts[2];
@@ -54,26 +41,15 @@
                         }
                     }
                 });
-
-                // Envoi des données par lots
                 const payload = { sessionId, individuals, families, isFirstBatch: true };
                 const blob = new Blob([JSON.stringify(payload)]);
                 const compressedStream = blob.stream().pipeThrough(new CompressionStream("gzip"));
-                
-                // Fetch avec vérification d'erreur
                 const response = await fetch("/api/save_data", {
                     method: "POST",
                     headers: { "Content-Type": "application/json", "Content-Encoding": "gzip" },
                     body: await new Response(compressedStream).blob()
                 });
-
-                if (!response.ok) {
-                    const errorMsg = await response.text();
-                    alert("Erreur lors de l'enregistrement : " + errorMsg);
-                    return;
-                }
-
-                window.location.href = "/menu?sessionId=" + sessionId;
+                if (response.ok) window.location.href = "/menu?sessionId=" + sessionId;
             };
             reader.readAsText(file);
         });
