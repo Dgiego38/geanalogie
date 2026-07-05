@@ -16,7 +16,7 @@ persons_collection = db.persons
 
 # Index pour TTL et recherche rapide
 persons_collection.create_index("expireAt", expireAfterSeconds=0)
-persons_collection.create_index("sessionId") # Crucial pour l'isolation et la performance
+persons_collection.create_index("sessionId")
 
 @app.route("/")
 def upload_page():
@@ -32,7 +32,6 @@ def chemin():
 
 @app.route("/api/save_data", methods=["POST"])
 def save_data():
-    # Décompression des données
     compressed_data = request.data
     decompressed_data = gzip.decompress(compressed_data)
     data = json.loads(decompressed_data.decode('utf-8'))
@@ -41,13 +40,11 @@ def save_data():
     individuals = data.get("individuals", [])
     is_first_batch = data.get("isFirstBatch", False)
     
-    # Nettoyage : suppression des anciennes données uniquement pour cette session
     if is_first_batch and session_id:
         persons_collection.delete_many({"sessionId": session_id})
     
     expire_at = datetime.utcnow() + timedelta(hours=1)
     
-    # Insertion des documents avec l'étiquette sessionId
     documents = [
         {"fullname": ind.get('name', 'Inconnu'), "sessionId": session_id, "expireAt": expire_at} 
         for ind in individuals
@@ -59,17 +56,22 @@ def save_data():
 
 @app.route("/api/personnes")
 def api_personnes():
-    # Récupération du sessionId depuis l'URL (ex: /api/personnes?sessionId=xyz&q=jean)
     session_id = request.args.get("sessionId")
     q = request.args.get("q", "")
-    
-    # Recherche filtrée par sessionId pour ne renvoyer que les données de l'utilisateur[cite: 6]
     cursor = persons_collection.find({
         "sessionId": session_id, 
         "fullname": {"$regex": q, "$options": "i"}
     }).limit(10)
-    
     return jsonify([doc["fullname"] for doc in cursor])
+
+@app.route("/chemin_result")
+def chemin_result():
+    # Ici, vous ajouterez votre logique d'algo de chemin
+    session_id = request.args.get("sessionId")
+    p1 = request.args.get("person1")
+    p2 = request.args.get("person2")
+    # Retour de test pour valider la connexion
+    return jsonify([{"name": p1, "type": "root", "level": 0}, {"name": p2, "type": "node", "level": 1}])
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

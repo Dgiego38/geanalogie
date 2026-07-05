@@ -6,40 +6,25 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-
 <script>
-    // Récupération du sessionId de l'URL pour le rendre disponible globalement
     const urlParams = new URLSearchParams(window.location.search);
     const sessionId = urlParams.get('sessionId');
-    
-    // Si pas de session, on peut rediriger vers l'upload ou gérer l'erreur
-    if (!sessionId) {
-        console.warn("Aucun sessionId trouvé dans l'URL");
-    }
+    if (!sessionId) { window.location.href = "/"; }
 </script>
-
 <div class="main">
     <h1>Recherche de chemin</h1>
-
     <h3>Personne 1</h3>
     <input id="p1" placeholder="Tape un nom...">
     <div id="suggestions1"></div>
-
     <h3>Personne 2</h3>
     <input id="p2" placeholder="Tape un nom...">
     <div id="suggestions2"></div>
-
     <br>
-    <!-- On s'assure que la fonction utilise le sessionId -->
     <button onclick="chercher()">Rechercher</button>
-
     <div id="resultat"></div>
 </div>
-
 <div id="tree"></div>
-
 <script src="{{ url_for('static', filename='js/tree.js') }}"></script>
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-
 </body>
 </html>

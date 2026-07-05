@@ -15,10 +15,8 @@
             const fileInput = document.getElementById("gedFile");
             const file = fileInput.files[0];
             const status = document.getElementById("status");
-
             if (!file) return alert("Choisissez un fichier GEDCOM");
 
-            // Génération de l'identifiant unique pour cette session d'import
             const sessionId = crypto.randomUUID(); 
             const reader = new FileReader();
 
@@ -31,17 +29,10 @@
 
                 const batchSize = 7000;
                 const tasks = [];
-                
                 for (let i = 0; i < individuals.length; i += batchSize) {
                     const batch = individuals.slice(i, i + batchSize);
-                    
                     const task = (async () => {
-                        // Inclusion du sessionId dans chaque lot envoyé au serveur
-                        const blob = new Blob([JSON.stringify({ 
-                            sessionId: sessionId, 
-                            individuals: batch, 
-                            isFirstBatch: (i === 0) 
-                        })]);
+                        const blob = new Blob([JSON.stringify({ sessionId, individuals: batch, isFirstBatch: (i === 0) })]);
                         const compressedStream = blob.stream().pipeThrough(new CompressionStream("gzip"));
                         const response = await fetch("/api/save_data", {
                             method: "POST",
@@ -50,13 +41,10 @@
                         });
                         if (!response.ok) throw new Error("Erreur lot " + i);
                     })();
-                    
                     tasks.push(task);
                     if (tasks.length >= 10) { await Promise.all(tasks); tasks.length = 0; }
                 }
                 await Promise.all(tasks);
-                
-                // Redirection vers le menu en transmettant le sessionId
                 window.location.href = "/menu?sessionId=" + sessionId;
             };
             reader.readAsText(file);
